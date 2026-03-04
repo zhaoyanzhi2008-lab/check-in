@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>管理员登录 · ICode签到系统</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:    #deeeff;
+  --card:  #ffffff;
+  --card2: #eef6ff;
+  --cyan:  #0088bb;
+  --orange:#e85d20;
+  --text:  #0a1f44;
+  --dim:   #4a7fa5;
+  --border:rgba(0,150,220,.2);
+}
+body{
+  font-family:'Noto Sans SC',sans-serif;
+  background:var(--bg);
+  min-height:100vh;
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+  position:relative;overflow:hidden;
+  color:var(--text);
+}
+
+/* Grid bg */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(0,150,220,.07) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,150,220,.07) 1px,transparent 1px);
+  background-size:40px 40px;
+}
+
+/* Radial glow */
+.bg-glow{
+  position:fixed;pointer-events:none;border-radius:50%;
+}
+.bg-glow.a{
+  width:500px;height:500px;
+  background:radial-gradient(rgba(0,153,204,.1),transparent 70%);
+  top:-150px;left:-100px;
+}
+.bg-glow.b{
+  width:400px;height:400px;
+  background:radial-gradient(rgba(0,100,180,.07),transparent 70%);
+  bottom:-100px;right:-100px;
+}
+
+/* Floating particles */
+.particle{
+  position:fixed;border-radius:50%;pointer-events:none;
+  animation:float var(--dur,8s) var(--del,0s) ease-in-out infinite alternate;
+}
+@keyframes float{
+  from{transform:translate(0,0)}
+  to{transform:translate(var(--tx,20px),var(--ty,-30px))}
+}
+
+/* ── CARD ── */
+.wrap{
+  width:100%;max-width:420px;
+  position:relative;z-index:1;
+  animation:rise .7s cubic-bezier(.22,1,.36,1) both;
+}
+@keyframes rise{from{opacity:0;transform:translateY(30px)}to{opacity:1;transform:translateY(0)}}
+
+/* Top edge line */
+.edge-line{
+  height:3px;
+  background:linear-gradient(90deg,transparent,#0088bb,#00aadd,transparent);
+  border-radius:2px 2px 0 0;
+}
+
+.card{
+  background:var(--card);
+  border:1px solid rgba(0,150,220,.18);
+  border-top:none;
+  border-radius:0 0 20px 20px;
+  box-shadow:0 20px 60px rgba(0,80,160,.12),0 2px 0 rgba(0,150,220,.08);
+}
+
+/* Hero */
+.hero{
+  padding:32px 32px 24px;
+  position:relative;overflow:hidden;
+  border-bottom:1px solid rgba(0,150,220,.12);
+  background:linear-gradient(135deg,#1a6fa8,#2196c4);
+}
+.hero::after{
+  content:'';position:absolute;
+  top:-60px;right:-60px;width:200px;height:200px;
+  border-radius:50%;
+  background:radial-gradient(rgba(255,255,255,.1),transparent 70%);
+}
+.hero-brand{
+  display:flex;align-items:center;gap:14px;
+  margin-bottom:24px;position:relative;z-index:1;
+}
+.brand-logo{
+  width:46px;height:46px;border-radius:12px;
+  border:2px solid rgba(255,255,255,.6);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Orbitron',sans-serif;
+  font-size:22px;font-weight:900;color:#fff;
+  box-shadow:0 4px 16px rgba(0,0,0,.15);
+  background:rgba(255,255,255,.15);
+}
+.brand-txt{line-height:1.2}
+.brand-name{
+  font-family:'Orbitron',sans-serif;
+  font-size:18px;font-weight:900;
+  color:#fff;letter-spacing:3px;
+}
+.brand-sub{
+  font-size:10px;color:rgba(255,255,255,.65);
+  letter-spacing:2px;margin-top:3px;
+}
+
+.hero-title{
+  font-size:26px;font-weight:900;color:#fff;
+  position:relative;z-index:1;
+}
+.hero-sub{
+  font-size:13px;color:rgba(255,255,255,.65);
+  margin-top:6px;position:relative;z-index:1;
+  letter-spacing:.5px;
+}
+
+/* Form */
+.form{padding:28px 32px 32px}
+
+.err{
+  background:#fff1f0;
+  border:1px solid #fcc;
+  border-radius:10px;padding:11px 14px;
+  font-size:13px;color:#cc3333;
+  display:none;align-items:center;gap:8px;
+  margin-bottom:20px;
+}
+.err.show{display:flex}
+
+.field{margin-bottom:20px}
+.flabel{
+  font-size:10px;color:var(--dim);font-weight:700;
+  letter-spacing:2px;text-transform:uppercase;
+  display:block;margin-bottom:8px;
+  font-family:'Orbitron',sans-serif;
+}
+.finput{
+  display:flex;align-items:center;
+  background:#f4f9ff;
+  border:1.5px solid rgba(0,150,220,.2);
+  border-radius:11px;overflow:hidden;
+  transition:border-color .2s,box-shadow .2s;
+}
+.finput:focus-within{
+  border-color:#0088bb;
+  box-shadow:0 0 0 3px rgba(0,136,187,.1);
+  background:#fff;
+}
+.ficon{
+  width:46px;display:flex;align-items:center;justify-content:center;
+  font-size:16px;color:var(--dim);flex-shrink:0;
+  border-right:1px solid rgba(0,150,220,.12);
+}
+.finput input{
+  flex:1;border:none;background:transparent;
+  padding:14px 14px;
+  font-size:14px;color:var(--text);font-family:inherit;outline:none;
+}
+.finput input::placeholder{color:rgba(74,127,165,.4);font-size:13px}
+
+/* Divider */
+.divider{
+  display:flex;align-items:center;gap:10px;margin:4px 0 20px;
+}
+.div-line{flex:1;height:1px;background:rgba(0,150,220,.15)}
+.div-text{font-size:10px;color:var(--dim);letter-spacing:1px}
+
+/* Login btn */
+.btn-login{
+  width:100%;
+  background:linear-gradient(135deg,#0077bb,#0099cc);
+  border:none;
+  border-radius:11px;
+  padding:15px;color:#fff;
+  font-size:14px;font-weight:900;
+  font-family:'Orbitron',sans-serif;
+  cursor:pointer;letter-spacing:2px;
+  transition:all .2s;
+  position:relative;overflow:hidden;
+  box-shadow:0 6px 20px rgba(0,153,204,.3);
+}
+.btn-login span{position:relative;z-index:1}
+.btn-login:hover{box-shadow:0 8px 28px rgba(0,153,204,.4);transform:translateY(-1px)}
+.btn-login:active{transform:scale(.99)}
+.btn-login:disabled{
+  opacity:.5;cursor:not-allowed;background:#94a3b8;box-shadow:none;transform:none;
+}
+
+.foot{
+  display:flex;justify-content:flex-end;
+  margin-top:14px;
+}
+.forgot{
+  font-size:12px;color:var(--dim);cursor:pointer;
+  transition:color .2s;text-decoration:none;letter-spacing:.5px;
+}
+.forgot:hover{color:var(--cyan)}
+
+/* Corner decorations */
+.corner{position:absolute;width:16px;height:16px;pointer-events:none}
+.corner-tl{top:0;left:0;border-top:2px solid rgba(0,150,220,.3);border-left:2px solid rgba(0,150,220,.3)}
+.corner-tr{top:0;right:0;border-top:2px solid rgba(0,150,220,.3);border-right:2px solid rgba(0,150,220,.3)}
+.corner-bl{bottom:0;left:0;border-bottom:2px solid rgba(0,150,220,.3);border-left:2px solid rgba(0,150,220,.3)}
+.corner-br{bottom:0;right:0;border-bottom:2px solid rgba(0,150,220,.3);border-right:2px solid rgba(0,150,220,.3)}
+</style>
+</head>
+<body>
+
+<div class="bg-glow a"></div>
+<div class="bg-glow b"></div>
+
+<!-- Particles -->
+<div class="particle" style="width:4px;height:4px;background:rgba(0,153,204,.3);top:20%;left:15%;--dur:9s;--tx:30px;--ty:-40px"></div>
+<div class="particle" style="width:3px;height:3px;background:rgba(0,100,180,.25);top:60%;right:20%;--dur:7s;--del:2s;--tx:-20px;--ty:25px"></div>
+<div class="particle" style="width:5px;height:5px;background:rgba(0,153,204,.2);bottom:20%;left:30%;--dur:11s;--del:1s;--tx:15px;--ty:-35px"></div>
+<div class="particle" style="width:2px;height:2px;background:rgba(0,180,100,.3);top:35%;right:40%;--dur:6s;--del:3s;--tx:-25px;--ty:15px"></div>
+
+<div class="wrap">
+  <div class="edge-line"></div>
+  <div class="card" style="position:relative">
+    <div class="corner corner-tl"></div>
+    <div class="corner corner-tr"></div>
+    <div class="corner corner-bl"></div>
+    <div class="corner corner-br"></div>
+
+    <div class="hero">
+      <div class="hero-brand">
+        <div class="brand-logo">I</div>
+        <div class="brand-txt">
+          <div class="brand-name">ICODE</div>
+          <div class="brand-sub">ADMIN CONSOLE</div>
+        </div>
+      </div>
+      <div class="hero-title">管理员登录</div>
+      <div class="hero-sub">ICode 签到管理系统 · 后台控制台</div>
+    </div>
+
+    <div class="form">
+      <div class="err" id="errBar"><span>⚠</span><span id="errMsg"></span></div>
+
+      <div class="field">
+        <label class="flabel">ACCOUNT</label>
+        <div class="finput">
+          <div class="ficon">📱</div>
+          <input type="text" id="phone" placeholder="手机号" autocomplete="username">
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="flabel">PASSWORD</label>
+        <div class="finput">
+          <div class="ficon">🔒</div>
+          <input type="password" id="pwd" placeholder="密码" autocomplete="current-password">
+        </div>
+      </div>
+
+      <button class="btn-login" id="loginBtn" onclick="login()">
+        <span>LOGIN →</span>
+      </button>
+
+      <div class="foot">
+        <a class="forgot" onclick="alert('请联系主管理员重置您的登录密码')">忘记密码？</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+async function login(){
+  const phone=document.getElementById('phone').value.trim()
+  const pwd=document.getElementById('pwd').value.trim()
+  if(!phone||!pwd){showErr('请输入账号和密码');return}
+  const btn=document.getElementById('loginBtn')
+  btn.querySelector('span').textContent='CONNECTING...'
+  btn.disabled=true
+  try{
+    const res=await fetch('/api/admin/login',{method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({phone,password:pwd})})
+    const d=await res.json()
+    if(res.ok) location.href='/admin/dashboard'
+    else{showErr(d.error||'登录失败');btn.querySelector('span').textContent='LOGIN →';btn.disabled=false}
+  }catch{
+    showErr('网络错误，请重试')
+    btn.querySelector('span').textContent='LOGIN →';btn.disabled=false
+  }
+}
+function showErr(m){document.getElementById('errMsg').textContent=m;document.getElementById('errBar').classList.add('show')}
+document.getElementById('pwd').addEventListener('keydown',e=>{if(e.key==='Enter')login()})
+</script>
+</body>
+</html>

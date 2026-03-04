@@ -1,0 +1,1334 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>管理后台 · ICode签到系统</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;900&family=Orbitron:wght@700;900&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:    #deeeff;
+  --card:  #ffffff;
+  --card2: #eef6ff;
+  --card3: #f4f9ff;
+  --cyan:  #0088bb;
+  --cyan-d:rgba(0,136,187,.1);
+  --orange:#ff6b35;
+  --green: #16a34a;
+  --amber: #d97706;
+  --red:   #dc2626;
+  --purple:#7c3aed;
+  --text:  #0a1f44;
+  --dim:   #4a7fa5;
+  --border:rgba(0,150,220,.18);
+  --bdr-s: rgba(0,136,187,.35);
+  --r:     12px;
+}
+body{
+  font-family:'Noto Sans SC',sans-serif;
+  background:var(--bg);color:var(--text);
+  display:flex;min-height:100vh;font-size:14px;
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:
+    linear-gradient(rgba(0,150,220,.07) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(0,150,220,.07) 1px,transparent 1px);
+  background-size:40px 40px;
+}
+
+/* ── SIDEBAR ─────────────────────────── */
+.sidebar{
+  width:236px;flex-shrink:0;
+  background:#e0f0fb;
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;
+  position:fixed;top:0;left:0;height:100vh;
+  z-index:200;transition:transform .3s;
+}
+
+.sb-brand{
+  padding:20px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;gap:12px;
+}
+.sb-logo{
+  width:38px;height:38px;border-radius:10px;
+  border:2px solid rgba(0,136,187,.5);
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Orbitron',sans-serif;
+  font-size:17px;font-weight:900;color:#0088bb;
+  background:rgba(0,136,187,.06);
+  box-shadow:0 2px 8px rgba(0,136,187,.15);
+}
+.sb-nm{font-family:'Orbitron',sans-serif;font-size:15px;font-weight:900;color:var(--cyan);letter-spacing:2px}
+.sb-vr{font-size:10px;color:var(--dim);letter-spacing:1px;margin-top:2px}
+
+.sb-nav{flex:1;padding:12px 8px;overflow-y:auto}
+.sb-nav::-webkit-scrollbar{width:3px}
+.sb-nav::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+
+.sb-section{margin-bottom:22px}
+.sb-sl{
+  font-size:9px;color:var(--dim);letter-spacing:2.5px;
+  padding:0 10px;margin-bottom:6px;
+  font-family:'Orbitron',sans-serif;
+}
+.sb-item{
+  display:flex;align-items:center;gap:10px;
+  padding:10px 14px;border-radius:9px;
+  cursor:pointer;color:var(--dim);font-size:13px;
+  transition:all .15s;margin-bottom:2px;position:relative;
+}
+.sb-item:hover{
+  background:rgba(0,136,187,.1);color:#0a1f44;
+}
+.sb-item.active{
+  background:rgba(0,136,187,.12);color:#0077aa;
+  border:1px solid rgba(0,136,187,.2);
+}
+.sb-item.active::after{
+  content:'';position:absolute;
+  right:-1px;top:25%;bottom:25%;
+  width:2px;background:var(--cyan);
+  border-radius:2px 0 0 2px;
+  box-shadow:none;
+}
+.si{width:18px;text-align:center;font-size:14px;flex-shrink:0}
+
+.sb-bottom{
+  padding:12px 8px;
+  border-top:1px solid var(--border);
+}
+.user-row{
+  display:flex;align-items:center;gap:10px;
+  padding:10px;border-radius:9px;
+  background:rgba(0,136,187,.08);border:1px solid rgba(0,150,220,.18);
+  margin-bottom:8px;
+}
+.user-av{
+  width:34px;height:34px;border-radius:9px;
+  border:1px solid var(--cyan);
+  display:flex;align-items:center;justify-content:center;
+  color:var(--cyan);font-weight:700;font-size:15px;flex-shrink:0;
+  background:rgba(0,150,220,.05);
+}
+.user-nm{font-size:13px;font-weight:600;color:var(--text)}
+.user-role{font-size:10px;color:var(--dim);letter-spacing:.5px}
+.btn-logout{
+  width:100%;background:transparent;
+  border:1px solid rgba(220,38,38,.18);
+  border-radius:8px;padding:8px;
+  color:rgba(220,38,38,.5);font-size:12px;font-family:inherit;
+  cursor:pointer;transition:all .18s;letter-spacing:.5px;
+}
+.btn-logout:hover{border-color:var(--red);color:var(--red);background:rgba(248,113,113,.05)}
+
+.ham{
+  display:none;position:fixed;top:14px;left:14px;z-index:300;
+  width:38px;height:38px;border-radius:9px;
+  background:#fff;border:1px solid rgba(0,150,220,.2);
+  color:#0088bb;font-size:16px;cursor:pointer;
+}
+.sb-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:150}
+
+/* ── MAIN ────────────────────────────── */
+.main{margin-left:236px;display:flex;flex-direction:column;min-height:100vh;position:relative;z-index:1}
+
+.topbar{
+  height:54px;background:#e0f0fb;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  padding:0 22px;position:sticky;top:0;z-index:50;
+}
+.tb-left{display:flex;align-items:center;gap:12px}
+.tb-title{
+  font-family:'Orbitron',sans-serif;
+  font-size:13px;color:var(--cyan);letter-spacing:2px;
+}
+.tb-badge{
+  border:1px solid var(--border);border-radius:20px;
+  padding:3px 12px;font-size:11px;color:var(--dim);
+}
+.tb-actions{display:flex;gap:8px;align-items:center}
+
+.content{padding:18px;flex:1}
+.panel{display:none}.panel.active{display:block}
+
+/* ── CARDS ──────────────────────────── */
+.card{
+  background:var(--card);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  margin-bottom:14px;
+  box-shadow:0 4px 20px rgba(0,0,0,.2);
+}
+.card-head{
+  padding:14px 18px;
+  display:flex;align-items:center;justify-content:space-between;
+  border-bottom:1px solid var(--border);
+  background:#f8fbff;
+}
+.card-title{font-size:14px;font-weight:700;color:var(--text)}
+.card-sub{font-size:11px;color:var(--dim);margin-top:2px}
+.card-body{padding:16px 18px}
+
+/* ── STAT CARDS ─────────────────────── */
+.stats-grid{
+  display:grid;grid-template-columns:repeat(4,1fr);
+  gap:12px;margin-bottom:14px;
+}
+.stat-card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:var(--r);padding:16px 18px;
+  position:relative;overflow:hidden;
+}
+.stat-card::before{
+  content:'';position:absolute;
+  top:0;left:0;right:0;height:2px;
+  background:var(--clr,var(--cyan));
+  box-shadow:none;
+}
+.stat-lbl{font-size:11px;color:var(--dim);margin-bottom:8px;letter-spacing:.5px}
+.stat-val{
+  font-family:'Orbitron',sans-serif;
+  font-size:28px;font-weight:900;
+  color:var(--clr,var(--cyan));
+  text-shadow:0 0 16px var(--clr,var(--cyan));
+}
+.stat-ico{
+  position:absolute;right:14px;top:14px;
+  font-size:24px;opacity:.1;
+}
+
+/* ── BUTTONS ────────────────────────── */
+.btn{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:8px 16px;border-radius:8px;
+  font-size:12px;font-weight:700;font-family:inherit;
+  cursor:pointer;transition:all .15s;border:none;
+  white-space:nowrap;letter-spacing:.5px;
+}
+.btn-cyan{
+  background:transparent;border:1.5px solid var(--bdr-s);
+  color:var(--cyan);
+}
+.btn-cyan:hover{background:var(--cyan-d);box-shadow:0 0 12px rgba(0,150,220,.15)}
+.btn-solid{
+  background:var(--cyan);color:var(--bg);
+  box-shadow:0 4px 14px rgba(0,150,220,.2);
+}
+.btn-solid:hover{box-shadow:0 6px 20px rgba(0,150,220,.35)}
+.btn-orange{
+  background:transparent;border:1.5px solid rgba(255,107,53,.3);color:var(--orange);
+}
+.btn-orange:hover{background:rgba(255,107,53,.08)}
+.btn-green{
+  background:transparent;border:1.5px solid rgba(0,230,118,.3);color:var(--green);
+}
+.btn-green:hover{background:rgba(0,230,118,.06)}
+.btn-red{
+  background:transparent;border:1.5px solid rgba(248,113,113,.2);color:var(--red);
+}
+.btn-red:hover{background:rgba(248,113,113,.06)}
+.btn-ghost{
+  background:transparent;border:1px solid var(--border);color:var(--dim);
+}
+.btn-ghost:hover{color:var(--text);border-color:var(--bdr-s)}
+.btn-sm{padding:6px 12px;font-size:11px;border-radius:7px}
+.btn-xs{padding:4px 9px;font-size:11px;border-radius:6px}
+
+/* ── TABLE ──────────────────────────── */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{
+  background:#eef6ff;
+  padding:10px 12px;text-align:left;
+  font-size:10px;color:rgba(0, 0, 0, 0.85);font-weight:700;
+  letter-spacing:1px;white-space:nowrap;
+  border-bottom:1px solid rgba(0,150,220,.2);
+  font-family:'Orbitron',sans-serif;
+}
+td{
+  padding:11px 12px;font-size:12px;
+  color:var(--text);border-bottom:1px solid rgba(0,150,220,.08);
+  white-space:nowrap;
+}
+tbody tr:hover td{background:#f4f9ff}
+tbody tr:last-child td{border-bottom:none}
+
+/* ── FILTER BAR ─────────────────────── */
+.filter-bar{
+  display:flex;gap:8px;flex-wrap:wrap;align-items:center;
+  padding:11px 18px;border-bottom:1px solid var(--border);
+  background:rgba(0,150,220,.02);
+}
+.filter-bar select,.filter-bar input{
+  background:#fff;
+  border:1px solid rgba(0,150,220,.2);border-radius:7px;
+  padding:7px 10px;font-size:12px;color:var(--text);
+  font-family:inherit;outline:none;cursor:pointer;
+  transition:border-color .15s;
+}
+.filter-bar select:focus,.filter-bar input:focus{border-color:#0088bb}
+.filter-bar select option{background:#fff}
+
+/* ── TAGS ───────────────────────────── */
+.tag{display:inline-flex;align-items:center;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;gap:3px;letter-spacing:.5px}
+.t-green{border:1px solid rgba(0,230,118,.3);color:var(--green);background:rgba(0,230,118,.07)}
+.t-amber{border:1px solid rgba(251,191,36,.3);color:var(--amber);background:rgba(251,191,36,.07)}
+.t-cyan{border:1px solid var(--border);color:var(--cyan);background:var(--cyan-d)}
+.t-red{border:1px solid rgba(248,113,113,.3);color:var(--red);background:rgba(248,113,113,.07)}
+.t-dim{border:1px solid var(--border);color:var(--dim);background:rgba(255,255,255,.03)}
+.t-orange{border:1px solid rgba(255,107,53,.3);color:var(--orange);background:rgba(255,107,53,.07)}
+
+/* ── MODAL ──────────────────────────── */
+.modal-bg{
+  display:none;position:fixed;inset:0;
+  background:rgba(0,40,80,.4);z-index:500;
+  align-items:center;justify-content:center;
+  padding:20px;backdrop-filter:blur(4px);
+}
+.modal-bg.show{display:flex}
+.modal{
+  background:#fff;border:1px solid rgba(0,150,220,.18);
+  border-radius:16px;width:100%;max-width:580px;
+  max-height:92vh;overflow-y:auto;
+  box-shadow:0 20px 60px rgba(0,80,160,.15);
+}
+.modal::-webkit-scrollbar{width:4px}
+.modal::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.modal-head{
+  padding:18px 22px;border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  background:#f8fbff;
+  position:sticky;top:0;z-index:1;
+}
+.modal-title{
+  font-size:15px;font-weight:700;color:var(--text);
+}
+.modal-close{
+  width:28px;height:28px;border-radius:7px;
+  background:transparent;border:1px solid var(--border);
+  color:var(--dim);font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .15s;
+}
+.modal-close:hover{border-color:rgba(220,38,38,.3);color:#dc2626}
+.modal-body{padding:20px 22px}
+.modal-foot{
+  padding:14px 22px;border-top:1px solid var(--border);
+  display:flex;justify-content:flex-end;gap:8px;
+}
+
+/* ── FORM ───────────────────────────── */
+.fg{display:grid;gap:12px;margin-bottom:12px}
+.fg.c2{grid-template-columns:1fr 1fr}
+.fg.c3{grid-template-columns:1fr 1fr 1fr}
+.ff{display:flex;flex-direction:column;gap:5px}
+.ff label{font-size:10px;color:var(--dim);font-weight:700;letter-spacing:1px;font-family:'Orbitron',sans-serif}
+.ff input,.ff select,.ff textarea{
+  background:#f4f9ff;
+  border:1.5px solid rgba(0,150,220,.2);border-radius:9px;
+  padding:10px 12px;color:var(--text);
+  font-size:13px;font-family:inherit;outline:none;
+  transition:border-color .15s,box-shadow .15s;
+}
+.ff input:focus,.ff select:focus,.ff textarea:focus{
+  border-color:#0088bb;
+  box-shadow:0 0 0 3px rgba(0,136,187,.1);
+}
+.ff select option{background:#fff}
+.ff textarea{resize:vertical}
+.ff .hint{font-size:10px;color:var(--dim);margin-top:2px}
+
+.color-row{display:flex;align-items:center;gap:8px}
+.color-row input[type=color]{
+  width:38px;height:34px;border-radius:8px;
+  border:1px solid var(--border);padding:2px;cursor:pointer;
+  background:#f4f9ff;
+}
+.color-row input[type=text]{flex:1}
+
+/* ── CHIPS ──────────────────────────── */
+.chips{display:flex;flex-wrap:wrap;gap:7px}
+.chip{
+  padding:5px 13px;border-radius:20px;font-size:11px;
+  cursor:pointer;border:1.5px solid var(--border);
+  background:#fff;color:var(--dim);
+  transition:all .15s;font-weight:500;
+}
+.chip:hover{border-color:#0088bb;color:var(--text)}
+.chip.on{
+  background:rgba(0,136,187,.08);border-color:#0088bb;
+  color:#0088bb;font-weight:700;
+}
+
+/* ── PERM GRID ──────────────────────── */
+.perm-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.perm-card{
+  display:flex;align-items:center;gap:10px;
+  background:#f4f9ff;border:1.5px solid rgba(0,150,220,.18);
+  border-radius:9px;padding:11px 13px;cursor:pointer;transition:all .15s;
+}
+.perm-card.on{background:rgba(0,136,187,.06);border-color:#0088bb}
+.perm-chk{
+  width:18px;height:18px;border-radius:5px;
+  border:1.5px solid rgba(0,150,220,.2);
+  display:flex;align-items:center;justify-content:center;
+  font-size:10px;color:#fff;flex-shrink:0;transition:all .15s;
+}
+.perm-card.on .perm-chk{background:#0088bb;border-color:#0088bb}
+.perm-lbl{font-size:12px;color:var(--text)}
+
+/* ── PROGRESS ───────────────────────── */
+.prog{height:6px;background:rgba(0,100,180,.08);border-radius:3px;overflow:hidden;margin-top:5px}
+.prog-fill{height:100%;border-radius:3px;transition:width .6s ease;background:linear-gradient(90deg,#0088bb,#00aadd)}
+
+/* ── QR ─────────────────────────────── */
+.qr-box{text-align:center;padding:10px 0}
+#qrCanvas{border-radius:10px;border:3px solid rgba(0,150,220,.25);margin:0 auto;display:block}
+.qr-url{font-size:11px;color:var(--dim);margin-top:12px;background:#f4f9ff;border-radius:8px;padding:8px 12px;word-break:break-all;border:1px solid var(--border)}
+
+/* ── LOG ROWS ───────────────────────── */
+.log-row{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 0;border-bottom:1px solid rgba(0,150,220,.08);font-size:12px;
+}
+.log-row:last-child{border-bottom:none}
+.log-dot{width:6px;height:6px;border-radius:50%;background:#16a34a;flex-shrink:0}
+
+/* ── TOAST ──────────────────────────── */
+.toast{
+  position:fixed;top:16px;right:16px;z-index:999;
+  background:#fff;border:1px solid rgba(0,150,220,.18);
+  border-radius:10px;padding:11px 16px;
+  box-shadow:0 6px 24px rgba(0,80,160,.12);
+  display:flex;align-items:center;gap:10px;
+  font-size:13px;transform:translateX(130%);transition:transform .3s;
+  min-width:200px;pointer-events:none;
+}
+.toast.show{transform:translateX(0)}
+.toast.ok{border-left:3px solid #16a34a}
+.toast.err{border-left:3px solid #dc2626}
+
+/* ── EMPTY ──────────────────────────── */
+.empty{text-align:center;padding:44px 20px;color:var(--dim)}
+.empty-ico{font-size:40px;opacity:.2;margin-bottom:12px}
+.empty-txt{font-size:14px;font-weight:600;margin-bottom:4px}
+.empty-sub{font-size:12px;opacity:.6}
+
+/* ── RESPONSIVE ─────────────────────── */
+@media(max-width:900px){
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.open{transform:translateX(0)}
+  .sb-overlay.show{display:block}
+  .main{margin-left:0}
+  .ham{display:flex;align-items:center;justify-content:center}
+  .topbar{padding:0 14px 0 60px}
+  .content{padding:12px}
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .fg.c3{grid-template-columns:1fr 1fr}
+}
+@media(max-width:600px){
+  .stats-grid{grid-template-columns:1fr 1fr}
+  .fg.c2,.fg.c3{grid-template-columns:1fr}
+  .card-head{flex-direction:column;align-items:flex-start;gap:10px}
+  .modal{border-radius:16px 16px 0 0;position:fixed;bottom:0;left:0;right:0;max-width:100%;max-height:92vh}
+  .perm-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<button class="ham" id="ham" onclick="toggleSidebar()">☰</button>
+<div class="sb-overlay" id="sbOverlay" onclick="toggleSidebar()"></div>
+
+<!-- SIDEBAR -->
+<div class="sidebar" id="sidebar">
+  <div class="sb-brand">
+    <div class="sb-logo">I</div>
+    <div>
+      <div class="sb-nm">ICODE</div>
+      <div class="sb-vr">v3.0 · ADMIN</div>
+    </div>
+  </div>
+  <nav class="sb-nav">
+    <div class="sb-section">
+      <div class="sb-sl">COMPETITION</div>
+      <div class="sb-item active" onclick="nav('competitions',this)"><span class="si">🏆</span>赛项管理</div>
+      <div class="sb-item" onclick="nav('players',this)"><span class="si">👥</span>选手信息</div>
+      <div class="sb-item" onclick="nav('stats',this)"><span class="si">📊</span>赛事统计</div>
+    </div>
+    <div class="sb-section" id="adminSection">
+      <div class="sb-sl">SYSTEM</div>
+      <div class="sb-item" onclick="nav('admins',this)"><span class="si">🛡</span>人员管理</div>
+      <div class="sb-item" onclick="nav('changepwd',this)"><span class="si">🔑</span>修改密码</div>
+    </div>
+  </nav>
+  <div class="sb-bottom">
+    <div class="user-row">
+      <div class="user-av" id="userAv">A</div>
+      <div>
+        <div class="user-nm" id="userName">加载中</div>
+        <div class="user-role" id="userRole">ADMIN</div>
+      </div>
+    </div>
+    <button class="btn-logout" onclick="logout()">EXIT ↗</button>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <div class="tb-left">
+      <div class="tb-title" id="topTitle">COMPETITIONS</div>
+      <div class="tb-badge" id="topBadge">ICode 2026</div>
+    </div>
+    <div class="tb-actions">
+      <a href="/" target="_blank" class="btn btn-ghost btn-sm">🔗 签到页</a>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- ══ 赛项管理 ══ -->
+    <div class="panel active" id="p-competitions">
+      <div class="card">
+        <div class="card-head">
+          <div><div class="card-title">赛项列表</div><div class="card-sub">管理所有比赛项目，可为每场赛事生成专属二维码</div></div>
+          <button class="btn btn-solid btn-sm" onclick="openCompModal()">＋ 新增赛项</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>赛事名称</th><th>地点</th><th>时间</th><th>选手数</th><th>状态</th><th>操作</th></tr></thead>
+            <tbody id="compTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 选手信息 ══ -->
+    <div class="panel" id="p-players">
+      <div class="card">
+        <div class="card-head">
+          <div><div class="card-title">选手信息</div><div class="card-sub" id="playerSub">请选择比赛</div></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <button class="btn btn-ghost btn-sm" onclick="dlTemplate()">📄 模板</button>
+            <button class="btn btn-cyan btn-sm" onclick="openImport()">📤 导入</button>
+            <button class="btn btn-ghost btn-sm" onclick="exportPlayers()">⬇ 导出</button>
+            <button class="btn btn-solid btn-sm" onclick="openPlayerModal()">＋ 新增</button>
+          </div>
+        </div>
+        <div class="filter-bar">
+          <select id="pCompSel" onchange="loadPlayers()"><option value="">— 选择比赛 —</option></select>
+          <input type="text" id="fSearch" placeholder="搜姓名/编号" oninput="loadPlayers()" style="width:120px">
+          <select id="fGroup" onchange="loadPlayers()"><option value="">所有组别</option></select>
+          <select id="fDate" onchange="loadPlayers()"><option value="">所有日期</option></select>
+          <select id="fSession" onchange="loadPlayers()"><option value="">所有场次</option></select>
+          <select id="fShirt" onchange="loadPlayers()">
+            <option value="">所有尺码</option>
+            <option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option>
+          </select>
+          <select id="fChecked" onchange="loadPlayers()">
+            <option value="">全部状态</option>
+            <option value="0">未签到</option>
+            <option value="1">已签到</option>
+          </select>
+          <button class="btn btn-ghost btn-sm" onclick="openFieldsModal()">⚙ 字段</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead id="playerHead"></thead>
+            <tbody id="playerTbody">
+              <tr><td colspan="15"><div class="empty"><div class="empty-ico">👥</div><div class="empty-txt">请先选择比赛</div></div></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 赛事统计 ══ -->
+    <div class="panel" id="p-stats">
+      <div class="card" style="margin-bottom:14px">
+        <div class="card-body" style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+          <span style="font-size:13px;color:var(--dim);white-space:nowrap">选择比赛：</span>
+          <select id="stCompSel" onchange="loadStats()" style="border:1px solid var(--border);border-radius:8px;padding:8px 13px;font-size:13px;font-family:inherit;outline:none;background:#f4f9ff;color:var(--text);min-width:200px;flex:1">
+            <option value="">— 请选择 —</option>
+          </select>
+          <button class="btn btn-green btn-sm" onclick="exportStats()">⬇ 下载统计</button>
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card" style="--clr:var(--cyan)"><div class="stat-lbl">报名总人数</div><div class="stat-val" id="st-total">—</div><div class="stat-ico">🏅</div></div>
+        <div class="stat-card" style="--clr:var(--green)"><div class="stat-lbl">已签到</div><div class="stat-val" id="st-chk">—</div><div class="stat-ico">✅</div></div>
+        <div class="stat-card" style="--clr:var(--amber)"><div class="stat-lbl">未签到</div><div class="stat-val" id="st-unchk">—</div><div class="stat-ico">⏳</div></div>
+        <div class="stat-card" style="--clr:var(--orange)"><div class="stat-lbl">签到率</div><div class="stat-val" id="st-rate">—</div><div class="stat-ico">📈</div></div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+        <div class="card" style="margin:0">
+          <div class="card-head"><div class="card-title">按场次</div></div>
+          <div class="card-body" id="stSession"><div class="empty"><div class="empty-ico">📅</div><div class="empty-txt">请选择比赛</div></div></div>
+        </div>
+        <div class="card" style="margin:0">
+          <div class="card-head"><div class="card-title">按组别</div></div>
+          <div class="card-body" id="stGroup"><div class="empty"><div class="empty-ico">🎯</div><div class="empty-txt">请选择比赛</div></div></div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="card" style="margin:0">
+          <div class="card-head"><div class="card-title">衣服尺码</div></div>
+          <div class="card-body"><div id="stShirt" style="display:flex;flex-wrap:wrap;gap:10px"></div></div>
+        </div>
+        <div class="card" style="margin:0">
+          <div class="card-head"><div class="card-title">最近签到</div></div>
+          <div class="card-body"><div id="stRecent"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 人员管理 ══ -->
+    <div class="panel" id="p-admins">
+      <div class="card">
+        <div class="card-head">
+          <div><div class="card-title">管理员列表</div><div class="card-sub">子管理员只能查看自己创建的赛事数据</div></div>
+          <button class="btn btn-solid btn-sm" onclick="openAdminModal()">＋ 添加</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>姓名</th><th>手机号</th><th>角色</th><th>权限</th><th>创建时间</th><th>操作</th></tr></thead>
+            <tbody id="adminTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ 修改密码 ══ -->
+    <div class="panel" id="p-changepwd">
+      <div class="card" style="max-width:420px">
+        <div class="card-head"><div class="card-title">修改密码</div></div>
+        <div class="card-body">
+          <div class="fg"><div class="ff"><label>当前密码</label><input type="password" id="op" placeholder="请输入当前密码"></div></div>
+          <div class="fg c2">
+            <div class="ff"><label>新密码</label><input type="password" id="np" placeholder="至少 6 位"></div>
+            <div class="ff"><label>确认新密码</label><input type="password" id="cp" placeholder="再次输入"></div>
+          </div>
+          <button class="btn btn-solid" onclick="changePwd()" style="margin-top:6px">确认修改</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /main -->
+
+<div class="toast" id="toast"></div>
+
+<!-- ══ COMP MODAL ══ -->
+<div class="modal-bg" id="mComp">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title" id="mCompT">新增赛项</div><button class="modal-close" onclick="closeModal('mComp')">×</button></div>
+    <div class="modal-body">
+      <div class="fg c2">
+        <div class="ff"><label>赛事名称 *</label><input id="cName" placeholder="2025 ICode全国大赛"></div>
+        <div class="ff"><label>赛事地点</label><input id="cLoc" placeholder="北京·国家会议中心"></div>
+      </div>
+      <div class="fg c2">
+        <div class="ff"><label>开始时间</label><input type="datetime-local" id="cStart"></div>
+        <div class="ff"><label>结束时间</label><input type="datetime-local" id="cEnd"></div>
+      </div>
+      <div class="fg">
+        <div class="ff"><label>Banner 欢迎语</label><input id="cBanner" placeholder="欢迎参加ICode比赛"></div>
+      </div>
+      <div class="fg c2">
+        <div class="ff"><label>Banner 背景色</label>
+          <div class="color-row">
+            <input type="color" id="cBgColor" value="#1a6fa8" oninput="document.getElementById('cBgHex').value=this.value">
+            <input type="text" id="cBgHex" placeholder="#1a6fa8" oninput="syncColor('cBgColor',this.value)">
+          </div>
+        </div>
+        <div class="ff"><label>强调色</label>
+          <div class="color-row">
+            <input type="color" id="cAccColor" value="#0088bb" oninput="document.getElementById('cAccHex').value=this.value">
+            <input type="text" id="cAccHex" placeholder="#0088bb" oninput="syncColor('cAccColor',this.value)">
+          </div>
+        </div>
+      </div>
+      <div class="fg">
+        <div class="ff"><label>赛事说明</label><textarea id="cDesc" rows="3" placeholder="比赛说明、注意事项..."></textarea></div>
+      </div>
+      <div class="fg">
+        <div class="ff"><label>组别（逗号分隔）</label><input id="cGroups" placeholder="初级组,中级组,高级组"></div>
+      </div>
+      <div class="fg c2">
+        <div class="ff">
+          <label>查询字段</label>
+          <input id="cQueryField" placeholder="player_no,account">
+          <span class="hint">可选：player_no, account, name 等，逗号分隔</span>
+        </div>
+        <div class="ff"><label>查询提示文字</label><input id="cQueryHint" placeholder="请输入报名编号或选手账号"></div>
+      </div>
+      <div class="fg">
+        <div class="ff">
+          <label>签到页显示字段</label>
+          <div class="chips" id="cFieldChips" style="margin-top:4px"></div>
+        </div>
+      </div>
+      <div class="fg">
+        <div class="ff" style="flex-direction:row;align-items:center;gap:12px">
+          <label style="margin:0;white-space:nowrap">是否上线</label>
+          <select id="cActive"><option value="1">✅ 上线（选手可访问）</option><option value="0">🔒 下线（仅后台）</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('mComp')">取消</button>
+      <button class="btn btn-solid" onclick="saveComp()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ QR MODAL ══ -->
+<div class="modal-bg" id="mQR">
+  <div class="modal" style="max-width:360px">
+    <div class="modal-head"><div class="modal-title" id="mQRT">赛事二维码</div><button class="modal-close" onclick="closeModal('mQR')">×</button></div>
+    <div class="modal-body">
+      <div class="qr-box">
+        <canvas id="qrCanvas" width="220" height="220"></canvas>
+        <div class="qr-url" id="qrUrl"></div>
+        <div style="font-size:11px;color:var(--dim);margin-top:10px;text-align:center">选手扫码后直接进入对应赛事签到页</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('mQR')">关闭</button>
+      <button class="btn btn-solid" onclick="downloadQR()">下载二维码</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PLAYER MODAL ══ -->
+<div class="modal-bg" id="mPlayer">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title" id="mPlayerT">新增选手</div><button class="modal-close" onclick="closeModal('mPlayer')">×</button></div>
+    <div class="modal-body">
+      <div class="fg c2">
+        <div class="ff"><label>姓名 *</label><input id="pName" placeholder="选手姓名"></div>
+        <div class="ff"><label>报名编号</label><input id="pNo" placeholder="IC2025001"></div>
+      </div>
+      <div class="fg c2">
+        <div class="ff"><label>账号</label><input id="pAcc" placeholder="user001"></div>
+        <div class="ff"><label>学校</label><input id="pSchool" placeholder="北京实验小学"></div>
+      </div>
+      <div class="fg c3">
+        <div class="ff"><label>年级</label><input id="pGrade" placeholder="六年级"></div>
+        <div class="ff"><label>组别</label><input id="pGroup" placeholder="初级组"></div>
+        <div class="ff"><label>衣服尺码</label>
+          <select id="pShirt"><option value="">—</option><option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option></select>
+        </div>
+      </div>
+      <div class="fg c3">
+        <div class="ff"><label>比赛日期</label><input type="date" id="pDate"></div>
+        <div class="ff"><label>场次</label><input id="pSession" placeholder="上午场"></div>
+        <div class="ff"><label>座位号</label><input id="pSeat" placeholder="A-001"></div>
+      </div>
+      <div class="fg c2">
+        <div class="ff"><label>签到状态</label>
+          <select id="pChkd"><option value="0">未签到</option><option value="1">已签到</option></select>
+        </div>
+        <div class="ff"><label>备注</label><input id="pRemark" placeholder="备注信息"></div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('mPlayer')">取消</button>
+      <button class="btn btn-solid" onclick="savePlayer()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ IMPORT MODAL ══ -->
+<div class="modal-bg" id="mImport">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-head"><div class="modal-title">导入选手信息</div><button class="modal-close" onclick="closeModal('mImport')">×</button></div>
+    <div class="modal-body">
+      <div class="fg"><div class="ff"><label>选择比赛</label><select id="importCid"><option value="">请选择</option></select></div></div>
+      <div class="fg"><div class="ff"><label>Excel 文件（.xlsx / .xls）</label>
+        <input type="file" id="importFile" accept=".xlsx,.xls"
+          style="background:var(--card3);border:1.5px dashed rgba(0,150,220,.3);border-radius:9px;padding:14px;cursor:pointer;color:var(--dim)">
+      </div></div>
+      <div style="background:rgba(0,150,220,.04);border:1px solid var(--border);border-radius:9px;padding:12px;font-size:11px;color:var(--dim);line-height:1.9">
+        📋 第一行为表头，支持列：报名编号、账号、<strong style="color:#ff6b6b">姓名（必填）</strong>、学校、年级、组别、比赛日期、场次、座位号、衣服尺码、备注
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('mImport')">取消</button>
+      <button class="btn btn-solid" onclick="doImport()">开始导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ADMIN MODAL ══ -->
+<div class="modal-bg" id="mAdmin">
+  <div class="modal">
+    <div class="modal-head"><div class="modal-title" id="mAdminT">添加管理员</div><button class="modal-close" onclick="closeModal('mAdmin')">×</button></div>
+    <div class="modal-body">
+      <div class="fg c2">
+        <div class="ff"><label>姓名 *</label><input id="aName" placeholder="管理员姓名"></div>
+        <div class="ff"><label>手机号 *（登录账号）</label><input id="aPhone" placeholder="13800000000"></div>
+      </div>
+      <div class="fg"><div class="ff"><label>初始密码 *</label><input type="text" id="aPwd" placeholder="设置初始密码（至少6位）"></div></div>
+      <div style="font-size:10px;color:var(--dim);font-family:'Orbitron',sans-serif;letter-spacing:1.5px;margin-bottom:10px;margin-top:4px">PERMISSIONS</div>
+      <div class="perm-grid" id="permGrid"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('mAdmin')">取消</button>
+      <button class="btn btn-solid" onclick="saveAdmin()">保存</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ FIELDS MODAL ══ -->
+<div class="modal-bg" id="mFields">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-head"><div class="modal-title">签到页显示字段</div><button class="modal-close" onclick="closeModal('mFields')">×</button></div>
+    <div class="modal-body">
+      <div class="fg"><div class="ff"><label>选择比赛</label><select id="fieldsCid" onchange="loadFieldChips()"><option value="">请选择</option></select></div></div>
+      <div style="font-size:12px;color:var(--dim);margin-bottom:10px">选择在选手签到页展示的字段：</div>
+      <div class="chips" id="fieldsChips"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('mFields')">取消</button>
+      <button class="btn btn-solid" onclick="saveFields()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const SHIRT_CLR={XS:'#c084fc',S:'#60a5fa',M:'#34d399',L:'#fbbf24',XL:'#f87171',XXL:'#f472b6'}
+const ALL_FIELDS=[
+  {k:'name',l:'姓名'},{k:'player_no',l:'报名编号'},{k:'account',l:'账号'},
+  {k:'school',l:'学校'},{k:'grade',l:'年级'},{k:'group_name',l:'组别'},
+  {k:'comp_date',l:'比赛日期'},{k:'session',l:'场次'},{k:'seat_no',l:'座位号'},
+  {k:'shirt_size',l:'衣服尺码'},{k:'remark',l:'备注'}
+]
+const PERMS=[
+  {k:'add_competition',l:'添加赛事'},{k:'import_players',l:'导入选手'},
+  {k:'view_players',l:'查看选手'},{k:'edit_players',l:'修改选手'},
+  {k:'checkin_stats',l:'查看统计'},{k:'manage_admins',l:'人员管理'}
+]
+const FL={name:'姓名',player_no:'报名编号',account:'账号',school:'学校',grade:'年级',
+  group_name:'组别',comp_date:'日期',session:'场次',seat_no:'座位号',
+  shirt_size:'尺码',checked_in:'签到',checkin_time:'签到时间',remark:'备注'}
+
+let ME=null, COMPS=[], curCid=null
+let editComp=null, editPlayer=null, editAdmin=null
+let selDispFields=[], adminPerms={}
+
+async function init(){
+  const r=await fetch('/api/admin/me')
+  if(!r.ok){location.href='/admin';return}
+  ME=await r.json()
+  document.getElementById('userName').textContent=ME.name
+  document.getElementById('userAv').textContent=ME.name[0]||'A'
+  document.getElementById('userRole').textContent=ME.is_main?'MAIN ADMIN':'SUB ADMIN'
+  if(!ME.is_main)document.getElementById('adminSection').style.display='none'
+  await loadComps()
+}
+
+// ─ Competitions ────────────────────────────────────────────────
+async function loadComps(){
+  const r=await fetch('/api/competitions')
+  COMPS=await r.json()
+  renderCompTable()
+  ;['pCompSel','stCompSel','importCid','fieldsCid'].forEach(id=>{
+    const s=document.getElementById(id),v=s.value
+    s.innerHTML='<option value="">— 请选择 —</option>'+
+      COMPS.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')
+    if(v)s.value=v
+  })
+}
+
+function renderCompTable(){
+  const tb=document.getElementById('compTbody')
+  if(!COMPS.length){
+    tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="empty-ico">🏆</div><div class="empty-txt">暂无赛项</div><div class="empty-sub">点击右上角新增</div></div></td></tr>'
+    return
+  }
+  tb.innerHTML=COMPS.map(c=>`<tr>
+    <td>
+      <strong style="color:var(--text)">${esc(c.name)}</strong>
+      ${c.creator_name?`<span style="font-size:10px;color:var(--dim);margin-left:6px">by ${esc(c.creator_name)}</span>`:''}
+    </td>
+    <td style="color:var(--dim)">${esc(c.location)||'—'}</td>
+    <td style="color:var(--dim);font-size:11px">${(c.start_time||'').slice(0,10)}${c.end_time?' ~ '+(c.end_time||'').slice(0,10):''}</td>
+    <td><span class="tag t-cyan">${c.pc||0} 人</span></td>
+    <td><span class="tag ${c.is_active?'t-green':'t-red'}">${c.is_active?'上线':'下线'}</span></td>
+    <td>
+      <div style="display:flex;gap:5px;flex-wrap:wrap">
+        <button class="btn btn-cyan btn-xs" onclick="showQR(${c.id},'${esc(c.name)}')">🔳 二维码</button>
+        <button class="btn btn-ghost btn-xs" onclick="editCompFn(${c.id})">编辑</button>
+        <button class="btn btn-red btn-xs" onclick="delComp(${c.id})">删除</button>
+      </div>
+    </td>
+  </tr>`).join('')
+}
+
+function openCompModal(){
+  editComp=null; selDispFields=['name','school','group_name','session','seat_no','shirt_size']
+  document.getElementById('mCompT').textContent='新增赛项'
+  ;['cName','cLoc','cDesc','cGroups'].forEach(i=>document.getElementById(i).value='')
+  document.getElementById('cBanner').value='欢迎参加ICode比赛'
+  document.getElementById('cBgHex').value='#1a6fa8'; document.getElementById('cBgColor').value='#1a6fa8'
+  document.getElementById('cAccHex').value='#0088bb'; document.getElementById('cAccColor').value='#0088bb'
+  document.getElementById('cStart').value=''; document.getElementById('cEnd').value=''
+  document.getElementById('cQueryField').value='player_no,account'
+  document.getElementById('cQueryHint').value='请输入报名编号或选手账号'
+  document.getElementById('cActive').value='1'
+  renderCompChips(); openModal('mComp')
+}
+
+async function editCompFn(id){
+  const c=COMPS.find(x=>x.id===id); if(!c)return
+  editComp=c; selDispFields=JSON.parse(c.display_fields||'[]')
+  document.getElementById('mCompT').textContent='编辑赛项'
+  document.getElementById('cName').value=c.name
+  document.getElementById('cLoc').value=c.location||''
+  document.getElementById('cStart').value=c.start_time||''
+  document.getElementById('cEnd').value=c.end_time||''
+  document.getElementById('cDesc').value=c.description||''
+  document.getElementById('cBanner').value=c.banner_text||''
+  document.getElementById('cBgHex').value=c.banner_color||'#1a6fa8'
+  document.getElementById('cBgColor').value=c.banner_color||'#1a6fa8'
+  document.getElementById('cAccHex').value=c.banner_accent||'#0088bb'
+  document.getElementById('cAccColor').value=c.banner_accent||'#0088bb'
+  document.getElementById('cGroups').value=JSON.parse(c.groups||'[]').join(',')
+  document.getElementById('cQueryField').value=c.query_field||'player_no,account'
+  document.getElementById('cQueryHint').value=c.query_hint||''
+  document.getElementById('cActive').value=c.is_active??1
+  renderCompChips(); openModal('mComp')
+}
+
+function renderCompChips(){
+  document.getElementById('cFieldChips').innerHTML=ALL_FIELDS.map(f=>
+    `<div class="chip${selDispFields.includes(f.k)?' on':''}" onclick="toggleCF('${f.k}',this)">${f.l}</div>`
+  ).join('')
+}
+
+function toggleCF(k,el){
+  if(k==='name')return
+  selDispFields.includes(k)
+    ?(selDispFields=selDispFields.filter(x=>x!==k),el.classList.remove('on'))
+    :(selDispFields.push(k),el.classList.add('on'))
+}
+
+function syncColor(inputId,val){
+  if(/^#[0-9a-fA-F]{6}$/.test(val))document.getElementById(inputId).value=val
+}
+
+async function saveComp(){
+  const name=document.getElementById('cName').value.trim()
+  if(!name){toast('请填写赛事名称','err');return}
+  const data={
+    name,location:document.getElementById('cLoc').value,
+    start_time:document.getElementById('cStart').value,
+    end_time:document.getElementById('cEnd').value,
+    description:document.getElementById('cDesc').value,
+    banner_text:document.getElementById('cBanner').value||'欢迎参加ICode比赛',
+    banner_color:document.getElementById('cBgColor').value,
+    banner_accent:document.getElementById('cAccColor').value,
+    groups:document.getElementById('cGroups').value.split(',').map(g=>g.trim()).filter(Boolean),
+    display_fields:selDispFields,
+    query_field:document.getElementById('cQueryField').value||'player_no,account',
+    query_hint:document.getElementById('cQueryHint').value,
+    is_active:parseInt(document.getElementById('cActive').value)
+  }
+  const url=editComp?`/api/competitions/${editComp.id}`:'/api/competitions'
+  const r=await fetch(url,{method:editComp?'PUT':'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+  if(r.ok){closeModal('mComp');await loadComps();toast(editComp?'赛项已更新':'赛项已创建')}
+  else{const d=await r.json();toast(d.error||'保存失败','err')}
+}
+
+async function delComp(id){
+  if(!confirm('确认删除该赛项及所有选手数据？此操作不可撤销！'))return
+  await fetch(`/api/competitions/${id}`,{method:'DELETE'})
+  await loadComps(); toast('赛项已删除')
+}
+
+// ─ QR ─────────────────────────────────────────────────────────
+function showQR(cid,name){
+  const url=location.origin+'/c/'+cid
+  document.getElementById('mQRT').textContent=`二维码 · ${name}`
+  document.getElementById('qrUrl').textContent=url
+  drawQR(url); openModal('mQR')
+}
+
+function drawQR(text){
+  const canvas=document.getElementById('qrCanvas')
+  const ctx=canvas.getContext('2d')
+  canvas.width=canvas.height=220
+  ctx.fillStyle='#f0f8ff'; ctx.fillRect(0,0,220,220)
+  const img=new Image()
+  img.onload=()=>{ctx.drawImage(img,10,10,200,200)}
+  img.onerror=()=>{
+    ctx.fillStyle='rgba(0,150,220,.05)'; ctx.fillRect(0,0,220,220)
+    ctx.fillStyle='#0088bb'; ctx.font='11px monospace'; ctx.textAlign='center'
+    ;(text.match(/.{1,24}/g)||[]).forEach((w,i)=>ctx.fillText(w,110,70+i*16))
+    ctx.font='bold 13px monospace'; ctx.fillText('扫码签到',110,190)
+  }
+  img.src=`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(text)}&format=png&margin=2&color=005588&bgcolor=f0f8ff`
+}
+
+function downloadQR(){
+  const a=document.createElement('a')
+  a.href=document.getElementById('qrCanvas').toDataURL('image/png')
+  a.download='ICode签到二维码.png'; a.click()
+}
+
+// ─ Players ────────────────────────────────────────────────────
+async function loadPlayers(){
+  const cid=document.getElementById('pCompSel').value
+  if(!cid){
+    document.getElementById('playerTbody').innerHTML='<tr><td colspan="15"><div class="empty"><div class="empty-ico">👥</div><div class="empty-txt">请先选择比赛</div></div></td></tr>'
+    return
+  }
+  curCid=cid
+  const params=new URLSearchParams({competition_id:cid,
+    search:document.getElementById('fSearch').value,
+    group:document.getElementById('fGroup').value,
+    date:document.getElementById('fDate').value,
+    session:document.getElementById('fSession').value,
+    shirt:document.getElementById('fShirt').value,
+    checked:document.getElementById('fChecked').value
+  })
+  const r=await fetch(`/api/players?${params}`)
+  if(!r.ok){toast('权限不足','err');return}
+  const players=await r.json()
+  const comp=COMPS.find(c=>c.id==cid)
+  if(comp){
+    document.getElementById('playerSub').textContent=`${comp.name} · 共 ${players.length} 人`
+    const grps=JSON.parse(comp.groups||'[]')
+    const gs=document.getElementById('fGroup'),gv=gs.value
+    gs.innerHTML='<option value="">所有组别</option>'+grps.map(g=>`<option>${g}</option>`).join('')
+    if(gv)gs.value=gv
+  }
+  const cols=['player_no','account','name','school','grade','group_name','comp_date','session','seat_no','shirt_size','checked_in','checkin_time','remark']
+  document.getElementById('playerHead').innerHTML=`<tr>${cols.map(c=>`<th>${FL[c]||c}</th>`).join('')}<th>操作</th></tr>`
+  if(!players.length){
+    document.getElementById('playerTbody').innerHTML=`<tr><td colspan="${cols.length+1}"><div class="empty"><div class="empty-ico">👥</div><div class="empty-txt">暂无选手数据</div></div></td></tr>`
+    return
+  }
+  document.getElementById('playerTbody').innerHTML=players.map(p=>{
+    const cells=cols.map(c=>{
+      if(c==='checked_in')return`<td><span class="tag ${p.checked_in?'t-green':'t-amber'}">${p.checked_in?'✓ 已签到':'⏳ 待签到'}</span></td>`
+      if(c==='shirt_size'&&p[c]){
+        const cl=SHIRT_CLR[p[c]]||'#7a9bb5'
+        return`<td><span style="background:${cl}15;color:${cl};padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;border:1px solid ${cl}25">${p[c]}</span></td>`
+      }
+      return`<td>${esc(String(p[c]||'—'))}</td>`
+    }).join('')
+    return`<tr>${cells}<td>
+      <div style="display:flex;gap:5px">
+        <button class="btn btn-cyan btn-xs" onclick='editPlayerFn(${JSON.stringify(p).replace(/'/g,"&#39;")})'>编辑</button>
+        <button class="btn btn-red btn-xs" onclick="delPlayer(${p.id})">删除</button>
+      </div>
+    </td></tr>`
+  }).join('')
+}
+
+function openPlayerModal(){
+  if(!curCid){toast('请先选择比赛','err');return}
+  editPlayer=null
+  document.getElementById('mPlayerT').textContent='新增选手'
+  ;['pName','pNo','pAcc','pSchool','pGrade','pGroup','pSession','pSeat','pRemark'].forEach(i=>document.getElementById(i).value='')
+  document.getElementById('pDate').value=''
+  document.getElementById('pShirt').value=''
+  document.getElementById('pChkd').value='0'
+  openModal('mPlayer')
+}
+
+function editPlayerFn(p){
+  editPlayer=p
+  document.getElementById('mPlayerT').textContent='编辑选手'
+  document.getElementById('pName').value=p.name||''
+  document.getElementById('pNo').value=p.player_no||''
+  document.getElementById('pAcc').value=p.account||''
+  document.getElementById('pSchool').value=p.school||''
+  document.getElementById('pGrade').value=p.grade||''
+  document.getElementById('pGroup').value=p.group_name||''
+  document.getElementById('pDate').value=p.comp_date||''
+  document.getElementById('pSession').value=p.session||''
+  document.getElementById('pSeat').value=p.seat_no||''
+  document.getElementById('pShirt').value=p.shirt_size||''
+  document.getElementById('pChkd').value=p.checked_in||0
+  document.getElementById('pRemark').value=p.remark||''
+  openModal('mPlayer')
+}
+
+async function savePlayer(){
+  const name=document.getElementById('pName').value.trim()
+  if(!name){toast('姓名为必填','err');return}
+  const data={competition_id:curCid,name,
+    player_no:document.getElementById('pNo').value,
+    account:document.getElementById('pAcc').value,
+    school:document.getElementById('pSchool').value,
+    grade:document.getElementById('pGrade').value,
+    group_name:document.getElementById('pGroup').value,
+    comp_date:document.getElementById('pDate').value,
+    session:document.getElementById('pSession').value,
+    seat_no:document.getElementById('pSeat').value,
+    shirt_size:document.getElementById('pShirt').value,
+    checked_in:parseInt(document.getElementById('pChkd').value),
+    checkin_time:editPlayer?.checkin_time||'',
+    remark:document.getElementById('pRemark').value
+  }
+  const url=editPlayer?`/api/players/${editPlayer.id}`:'/api/players'
+  const r=await fetch(url,{method:editPlayer?'PUT':'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+  if(r.ok){closeModal('mPlayer');await loadPlayers();toast(editPlayer?'已更新':'已添加')}
+  else toast('保存失败','err')
+}
+
+async function delPlayer(id){
+  if(!confirm('确认删除该选手？'))return
+  await fetch(`/api/players/${id}`,{method:'DELETE'})
+  await loadPlayers(); toast('已删除')
+}
+
+function openImport(){document.getElementById('importCid').value=curCid||'';openModal('mImport')}
+
+async function doImport(){
+  const cid=document.getElementById('importCid').value
+  const file=document.getElementById('importFile').files[0]
+  if(!cid){toast('请选择比赛','err');return}
+  if(!file){toast('请选择文件','err');return}
+  const fd=new FormData(); fd.append('competition_id',cid); fd.append('file',file)
+  const r=await fetch('/api/players/import',{method:'POST',body:fd})
+  const d=await r.json()
+  if(r.ok){closeModal('mImport');await loadPlayers();await loadComps();toast(`成功导入 ${d.count} 名选手`)}
+  else toast(d.error||'导入失败','err')
+}
+
+function exportPlayers(){if(!curCid){toast('请先选择比赛','err');return};window.open(`/api/players/export/${curCid}`)}
+function dlTemplate(){window.open('/api/players/template')}
+
+// ─ Fields ────────────────────────────────────────────────────
+function openFieldsModal(){
+  document.getElementById('fieldsCid').value=curCid||''
+  loadFieldChips(); openModal('mFields')
+}
+
+function loadFieldChips(){
+  const cid=document.getElementById('fieldsCid').value
+  const comp=COMPS.find(c=>c.id==cid)
+  const active=comp?JSON.parse(comp.display_fields||'[]'):[]
+  document.getElementById('fieldsChips').innerHTML=ALL_FIELDS.map(f=>
+    `<div class="chip${active.includes(f.k)?' on':''}" data-k="${f.k}" onclick="this.classList.toggle('on')">${f.l}</div>`
+  ).join('')
+}
+
+async function saveFields(){
+  const cid=document.getElementById('fieldsCid').value
+  if(!cid){toast('请选择比赛','err');return}
+  const fields=[...document.querySelectorAll('#fieldsChips .chip.on')].map(el=>el.dataset.k)
+  const comp=COMPS.find(c=>c.id==cid); if(!comp)return
+  const data={...comp,groups:JSON.parse(comp.groups||'[]'),display_fields:fields}
+  await fetch(`/api/competitions/${cid}`,{method:'PUT',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+  closeModal('mFields'); await loadComps(); toast('字段已保存')
+}
+
+// ─ Stats ──────────────────────────────────────────────────────
+async function loadStats(){
+  const cid=document.getElementById('stCompSel').value; if(!cid)return
+  const r=await fetch(`/api/stats/${cid}`)
+  if(!r.ok){toast('权限不足','err');return}
+  const d=await r.json()
+  document.getElementById('st-total').textContent=d.total
+  document.getElementById('st-chk').textContent=d.checked
+  document.getElementById('st-unchk').textContent=d.unchecked
+  document.getElementById('st-rate').textContent=d.total?Math.round(d.checked/d.total*100)+'%':'0%'
+
+  const bar=(items,clr='var(--cyan)')=>items.length
+    ? items.map(s=>`
+        <div style="margin-bottom:11px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+            <span>${esc(s.label)}</span>
+            <span style="color:var(--dim)">${s.checked}/${s.total}</span>
+          </div>
+          <div class="prog">
+            <div class="prog-fill" style="width:${s.total?Math.round(s.checked/s.total*100):0}%;background:${clr}"></div>
+          </div>
+        </div>`).join('')
+    : '<div style="color:var(--dim);font-size:12px">暂无数据</div>'
+
+  document.getElementById('stSession').innerHTML=bar(
+    d.by_session.map(s=>({...s,label:`${s.comp_date} ${s.session}`})))
+  document.getElementById('stGroup').innerHTML=bar(
+    d.by_group.map(g=>({...g,label:g.group_name||'未分组'})),
+    'linear-gradient(90deg,var(--purple),var(--cyan))')
+
+  document.getElementById('stShirt').innerHTML=d.by_shirt.length
+    ? d.by_shirt.map(s=>{
+        const c=SHIRT_CLR[s.shirt_size]||'#7a9bb5'
+        return`<div style="background:${c}0d;border:1px solid ${c}25;border-radius:10px;padding:12px 16px;text-align:center;min-width:68px">
+          <div style="font-family:'Orbitron',sans-serif;font-size:13px;font-weight:900;color:${c}">${s.shirt_size||'?'}</div>
+          <div style="font-size:22px;font-weight:900;margin:4px 0;color:${c}">${s.total}</div>
+          <div style="font-size:10px;color:var(--dim)">件</div>
+        </div>`}).join('')
+    : '<div style="color:var(--dim);font-size:12px">暂无数据</div>'
+
+  document.getElementById('stRecent').innerHTML=d.recent.length
+    ? d.recent.map(r=>`<div class="log-row">
+        <div class="log-dot"></div>
+        <div style="flex:1">
+          <strong>${esc(r.name)}</strong>
+          <span style="color:var(--dim);font-size:11px;margin-left:8px">${esc(r.group_name)} · ${esc(r.session)}</span>
+        </div>
+        <div style="font-size:11px;color:var(--dim);font-family:monospace">${(r.checkin_time||'').slice(11,16)}</div>
+      </div>`).join('')
+    : '<div style="color:var(--dim);font-size:12px;padding:10px 0">暂无签到记录</div>'
+}
+
+function exportStats(){
+  const cid=document.getElementById('stCompSel').value
+  if(!cid){toast('请先选择比赛','err');return}
+  window.open(`/api/stats/export/${cid}`)
+}
+
+// ─ Admins ────────────────────────────────────────────────────
+async function loadAdmins(){
+  const r=await fetch('/api/admins'); if(!r.ok)return
+  const admins=await r.json()
+  document.getElementById('adminTbody').innerHTML=admins.map(a=>{
+    const perms=JSON.parse(a.permissions||'{}')
+    const ptags=a.is_main
+      ? '<span class="tag t-orange">全部权限</span>'
+      : PERMS.filter(p=>perms[p.k]).map(p=>`<span class="tag t-dim" style="margin:1px">${p.l}</span>`).join('')||
+        '<span style="color:var(--dim);font-size:11px">无权限</span>'
+    return`<tr>
+      <td><strong>${esc(a.name)}</strong></td>
+      <td style="font-family:monospace;font-size:12px">${esc(a.phone)}</td>
+      <td><span class="tag ${a.is_main?'t-orange':'t-cyan'}">${a.is_main?'主管理员':'子管理员'}</span></td>
+      <td>${ptags}</td>
+      <td style="color:var(--dim);font-size:11px">${(a.created_at||'').slice(0,10)}</td>
+      <td>${!a.is_main?`<div style="display:flex;gap:5px">
+        <button class="btn btn-ghost btn-xs" onclick='editAdminFn(${JSON.stringify(a).replace(/'/g,"&#39;")})'>编辑</button>
+        <button class="btn btn-red btn-xs" onclick="delAdmin(${a.id})">删除</button>
+      </div>`:'—'}</td>
+    </tr>`
+  }).join('')
+}
+
+function openAdminModal(){
+  editAdmin=null; adminPerms={}
+  document.getElementById('mAdminT').textContent='添加管理员'
+  ;['aName','aPhone','aPwd'].forEach(i=>document.getElementById(i).value='')
+  renderPermGrid(); openModal('mAdmin')
+}
+
+function editAdminFn(a){
+  editAdmin=a; adminPerms=JSON.parse(a.permissions||'{}')
+  document.getElementById('mAdminT').textContent='编辑管理员'
+  document.getElementById('aName').value=a.name
+  document.getElementById('aPhone').value=a.phone
+  document.getElementById('aPwd').value=''
+  renderPermGrid(); openModal('mAdmin')
+}
+
+function renderPermGrid(){
+  document.getElementById('permGrid').innerHTML=PERMS.map(p=>`
+    <div class="perm-card${adminPerms[p.k]?' on':''}" onclick="togglePerm('${p.k}',this)">
+      <div class="perm-chk">${adminPerms[p.k]?'✓':''}</div>
+      <span class="perm-lbl">${p.l}</span>
+    </div>`).join('')
+}
+
+function togglePerm(k,el){
+  adminPerms[k]=!adminPerms[k]
+  el.classList.toggle('on',adminPerms[k])
+  el.querySelector('.perm-chk').textContent=adminPerms[k]?'✓':''
+}
+
+async function saveAdmin(){
+  const name=document.getElementById('aName').value.trim()
+  const phone=document.getElementById('aPhone').value.trim()
+  const pwd=document.getElementById('aPwd').value.trim()
+  if(!editAdmin&&(!name||!phone||!pwd)){toast('请填写完整信息','err');return}
+  const data={name,permissions:adminPerms}
+  if(!editAdmin){data.phone=phone;data.password=pwd}
+  if(editAdmin&&pwd)data.password=pwd
+  const url=editAdmin?`/api/admins/${editAdmin.id}`:'/api/admins'
+  const r=await fetch(url,{method:editAdmin?'PUT':'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+  const d=await r.json()
+  if(r.ok){closeModal('mAdmin');await loadAdmins();toast('保存成功')}
+  else toast(d.error||'保存失败','err')
+}
+
+async function delAdmin(id){
+  if(!confirm('确认删除该管理员？'))return
+  await fetch(`/api/admins/${id}`,{method:'DELETE'})
+  await loadAdmins(); toast('已删除')
+}
+
+// ─ Password ──────────────────────────────────────────────────
+async function changePwd(){
+  const op=document.getElementById('op').value
+  const np=document.getElementById('np').value
+  const cp=document.getElementById('cp').value
+  if(!op||!np){toast('请填写完整','err');return}
+  if(np!==cp){toast('两次密码不一致','err');return}
+  if(np.length<6){toast('新密码至少6位','err');return}
+  const r=await fetch('/api/admin/change-password',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({old_password:op,new_password:np})})
+  const d=await r.json()
+  if(r.ok){toast('密码修改成功');['op','np','cp'].forEach(i=>document.getElementById(i).value='')}
+  else toast(d.error||'修改失败','err')
+}
+
+// ─ Nav ────────────────────────────────────────────────────────
+const TITLES={competitions:'COMPETITIONS',players:'PLAYERS',stats:'STATISTICS',admins:'TEAM',changepwd:'PASSWORD'}
+function nav(name,el){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'))
+  document.getElementById('p-'+name).classList.add('active')
+  document.querySelectorAll('.sb-item').forEach(i=>i.classList.remove('active'))
+  el.classList.add('active')
+  document.getElementById('topTitle').textContent=TITLES[name]||name
+  if(name==='admins')loadAdmins()
+  closeSidebar()
+}
+
+function toggleSidebar(){
+  document.getElementById('sidebar').classList.toggle('open')
+  document.getElementById('sbOverlay').classList.toggle('show')
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open')
+  document.getElementById('sbOverlay').classList.remove('show')
+}
+
+// ─ Modal ─────────────────────────────────────────────────────
+function openModal(id){document.getElementById(id).classList.add('show')}
+function closeModal(id){document.getElementById(id).classList.remove('show')}
+document.querySelectorAll('.modal-bg').forEach(el=>
+  el.addEventListener('click',function(e){if(e.target===this)this.classList.remove('show')}))
+
+// ─ Toast ─────────────────────────────────────────────────────
+function toast(msg,type='ok'){
+  const el=document.getElementById('toast')
+  el.innerHTML=`<span>${type==='ok'?'✅':'❌'}</span><span>${msg}</span>`
+  el.className=`toast ${type} show`
+  setTimeout(()=>el.classList.remove('show'),3000)
+}
+
+async function logout(){await fetch('/api/admin/logout',{method:'POST'});location.href='/admin'}
+
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+
+init()
+</script>
+</body>
+</html>
