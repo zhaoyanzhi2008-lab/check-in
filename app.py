@@ -438,26 +438,29 @@ def import_players():
     a = get_me()
     if not can(a, 'import_players'): return jsonify({'error': '无权限'}), 403
     cid = request.form.get('competition_id')
-    f = request.files.get('file')
-    if not cid or not f: return jsonify({'error': '参数缺失'}), 400
-    wb = openpyxl.load_workbook(f, data_only=True)
+    upload = request.files.get('file')
+    if not cid or not upload: return jsonify({'error': '参数缺失'}), 400
+    wb = openpyxl.load_workbook(upload, data_only=True)
     ws = wb.active
-    hdrs = [str(c.value).strip() if c.value else '' for c in ws[1]]
+    # Strip asterisks from headers so "姓名*" matches "姓名"
+    hdrs = [str(c.value).strip().rstrip('*').strip() if c.value else '' for c in ws[1]]
     fm = {'报名编号':'player_no','账号':'account','姓名':'name','学校':'school',
           '年级':'grade','组别':'group_name','比赛日期':'comp_date','场次':'session',
           '座位号':'seat_no','衣服尺码':'shirt_size','备注':'remark'}
     conn = db(); cnt = 0
     for row in ws.iter_rows(min_row=2, values_only=True):
         if not any(row): continue
-        pd = {fm[hdrs[i]]: str(row[i]) if row[i] is not None else ''
-              for i, h in enumerate(hdrs) if h in fm and i < len(row)}
-        if not pd.get('name'): continue
+        pdata = {}
+        for i, h in enumerate(hdrs):
+            if h in fm and i < len(row):
+                pdata[fm[h]] = str(row[i]).strip() if row[i] is not None else ''
+        if not pdata.get('name'): continue
         conn.execute("""INSERT INTO players(competition_id,player_no,account,name,school,grade,
                         group_name,comp_date,session,seat_no,shirt_size,remark) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
-                     (cid, pd.get('player_no',''), pd.get('account',''), pd.get('name',''),
-                      pd.get('school',''), pd.get('grade',''), pd.get('group_name',''),
-                      pd.get('comp_date',''), pd.get('session',''), pd.get('seat_no',''),
-                      pd.get('shirt_size',''), pd.get('remark','')))
+                     (cid, pdata.get('player_no',''), pdata.get('account',''), pdata.get('name',''),
+                      pdata.get('school',''), pdata.get('grade',''), pdata.get('group_name',''),
+                      pdata.get('comp_date',''), pdata.get('session',''), pdata.get('seat_no',''),
+                      pdata.get('shirt_size',''), pdata.get('remark','')))
         cnt += 1
     conn.commit(); conn.close()
     return jsonify({'success': True, 'count': cnt})
