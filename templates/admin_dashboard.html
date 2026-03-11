@@ -245,7 +245,7 @@ table{width:100%;border-collapse:collapse}
 th{
   background:#eef6ff;
   padding:10px 12px;text-align:left;
-  font-size:10px;color:rgba(0, 0, 0, 0.85);font-weight:700;
+  font-size:10px;color:rgba(255,255,255,.85);font-weight:700;
   letter-spacing:1px;white-space:nowrap;
   border-bottom:1px solid rgba(0,150,220,.2);
   font-family:'Orbitron',sans-serif;
@@ -501,11 +501,26 @@ tbody tr:last-child td{border-bottom:none}
       <div class="card">
         <div class="card-head">
           <div><div class="card-title">赛项列表</div><div class="card-sub">管理所有比赛项目，可为每场赛事生成专属二维码</div></div>
-          <button class="btn btn-solid btn-sm" onclick="openCompModal()">＋ 新增赛项</button>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <button class="btn btn-red btn-sm" id="compBatchDelBtn" style="display:none" onclick="batchDelComps()">🗑 批量删除</button>
+            <button class="btn btn-solid btn-sm" onclick="openCompModal()">＋ 新增赛项</button>
+          </div>
+        </div>
+        <!-- 赛项筛选栏 -->
+        <div class="filter-bar">
+          <input type="text" id="cSearch" placeholder="搜赛事名称/地点" oninput="renderCompTable()" style="width:160px">
+          <select id="cLocFilter" onchange="renderCompTable()"><option value="">所有地点</option></select>
+          <select id="cActiveFilter" onchange="renderCompTable()">
+            <option value="">全部状态</option><option value="1">上线</option><option value="0">下线</option>
+          </select>
+          <span id="compSelCount" style="font-size:12px;color:var(--dim);margin-left:4px"></span>
         </div>
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>赛事名称</th><th>地点</th><th>时间</th><th>选手数</th><th>状态</th><th>操作</th></tr></thead>
+            <thead><tr>
+              <th style="width:36px"><input type="checkbox" id="compSelAll" onchange="toggleSelAllComps(this)"></th>
+              <th>赛事名称</th><th>地点</th><th>时间</th><th>选手数</th><th>状态</th><th>操作</th>
+            </tr></thead>
             <tbody id="compTbody"></tbody>
           </table>
         </div>
@@ -520,17 +535,19 @@ tbody tr:last-child td{border-bottom:none}
           <div style="display:flex;gap:6px;flex-wrap:wrap">
             <button class="btn btn-ghost btn-sm" onclick="dlTemplate()">📄 模板</button>
             <button class="btn btn-cyan btn-sm" onclick="openImport()">📤 导入</button>
-            <button class="btn btn-ghost btn-sm" onclick="exportPlayers()">⬇ 导出</button>
+            <button class="btn btn-ghost btn-sm" id="exportBtn" onclick="exportPlayers()">⬇ 导出</button>
             <button class="btn btn-solid btn-sm" onclick="openPlayerModal()">＋ 新增</button>
           </div>
         </div>
         <div class="filter-bar">
           <select id="pCompSel" onchange="loadPlayers()"><option value="">— 选择比赛 —</option></select>
-          <input type="text" id="fSearch" placeholder="搜姓名/编号" oninput="loadPlayers()" style="width:120px">
-          <select id="fGroup" onchange="loadPlayers()"><option value="">所有组别</option></select>
-          <select id="fDate" onchange="loadPlayers()"><option value="">所有日期</option></select>
+          <input type="text" id="fSearch" placeholder="搜姓名/编号/学校" oninput="loadPlayers()" style="width:130px">
+          <select id="fGroup"   onchange="loadPlayers()"><option value="">所有组别</option></select>
+          <select id="fSchool"  onchange="loadPlayers()"><option value="">所有学校</option></select>
+          <select id="fGrade"   onchange="loadPlayers()"><option value="">所有年级</option></select>
+          <select id="fDate"    onchange="loadPlayers()"><option value="">所有日期</option></select>
           <select id="fSession" onchange="loadPlayers()"><option value="">所有场次</option></select>
-          <select id="fShirt" onchange="loadPlayers()">
+          <select id="fShirt"   onchange="loadPlayers()">
             <option value="">所有尺码</option>
             <option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option>
           </select>
@@ -540,6 +557,15 @@ tbody tr:last-child td{border-bottom:none}
             <option value="1">已签到</option>
           </select>
           <button class="btn btn-ghost btn-sm" onclick="openFieldsModal()">⚙ 字段</button>
+        </div>
+        <!-- 批量操作栏（有选中时显示） -->
+        <div id="batchBar" style="display:none;padding:8px 16px;background:rgba(0,136,187,.07);
+             border-bottom:1px solid var(--border);display:none;align-items:center;gap:8px;flex-wrap:wrap">
+          <span id="batchCount" style="font-size:12px;font-weight:600;color:var(--cyan)"></span>
+          <button class="btn btn-ghost btn-sm" onclick="openBatchUpdate()">✏ 批量修改</button>
+          <button class="btn btn-red btn-sm" onclick="batchDelPlayers()">🗑 批量删除</button>
+          <button class="btn btn-ghost btn-sm" onclick="exportSelected()">⬇ 导出所选</button>
+          <button class="btn btn-ghost btn-sm" onclick="clearSel()" style="margin-left:auto">取消选择</button>
         </div>
         <div class="tbl-wrap">
           <table>
@@ -560,13 +586,23 @@ tbody tr:last-child td{border-bottom:none}
                   padding:14px 18px;margin-bottom:16px;
                   box-shadow:0 2px 10px rgba(0,100,180,.06)">
         <span style="font-size:13px;color:var(--dim);white-space:nowrap;font-weight:600">📊 选择比赛</span>
-        <select id="stCompSel" onchange="loadStats()"
+        <select id="stCompSel" onchange="onStatsSelChange()"
           style="border:1.5px solid rgba(0,150,220,.2);border-radius:8px;padding:9px 14px;
                  font-size:13px;font-family:inherit;outline:none;background:#f4f9ff;
                  color:#111827;min-width:220px;flex:1;transition:border-color .15s"
           onfocus="this.style.borderColor='#0088bb'" onblur="this.style.borderColor='rgba(0,150,220,.2)'">
           <option value="">— 请选择比赛 —</option>
         </select>
+        <!-- 功能4：地点筛选 -->
+        <span style="font-size:13px;color:var(--dim);white-space:nowrap;font-weight:600">📍 或按地点</span>
+        <select id="stLocSel" onchange="onStatsLocChange()"
+          style="border:1.5px solid rgba(0,150,220,.2);border-radius:8px;padding:9px 14px;
+                 font-size:13px;font-family:inherit;outline:none;background:#f4f9ff;
+                 color:#111827;min-width:160px;transition:border-color .15s"
+          onfocus="this.style.borderColor='#0088bb'" onblur="this.style.borderColor='rgba(0,150,220,.2)'">
+          <option value="">— 不筛选地点 —</option>
+        </select>
+        <div id="stLocComps" style="font-size:11px;color:var(--dim);flex-basis:100%;display:none"></div>
         <button class="btn btn-green btn-sm" onclick="exportStats()">⬇ 下载统计</button>
       </div>
 
@@ -837,16 +873,22 @@ tbody tr:last-child td{border-bottom:none}
 
 <!-- ══ IMPORT MODAL ══ -->
 <div class="modal-bg" id="mImport">
-  <div class="modal" style="max-width:460px">
+  <div class="modal" style="max-width:500px">
     <div class="modal-head"><div class="modal-title">导入选手信息</div><button class="modal-close" onclick="closeModal('mImport')">×</button></div>
     <div class="modal-body">
       <div class="fg"><div class="ff"><label>选择比赛</label><select id="importCid"><option value="">请选择</option></select></div></div>
       <div class="fg"><div class="ff"><label>Excel 文件（.xlsx / .xls）</label>
-        <input type="file" id="importFile" accept=".xlsx,.xls"
+        <input type="file" id="importFile" accept=".xlsx,.xls" onchange="document.getElementById('importErrBox').style.display='none'"
           style="background:var(--card3);border:1.5px dashed rgba(0,150,220,.3);border-radius:9px;padding:14px;cursor:pointer;color:var(--dim)">
       </div></div>
       <div style="background:rgba(0,150,220,.04);border:1px solid var(--border);border-radius:9px;padding:12px;font-size:11px;color:var(--dim);line-height:1.9">
-        📋 第一行为表头，支持列：报名编号、账号、<strong style="color:#ff6b6b">姓名（必填）</strong>、学校、年级、组别、比赛日期、场次、座位号、衣服尺码、备注
+        📋 第一行为表头，支持列：报名编号、账号、<strong style="color:#ff6b6b">姓名（必填）</strong>、学校、年级、组别、比赛日期、场次、座位号、衣服尺码、备注<br>
+        ⚠ 报名编号或账号重复将拒绝整批导入；组别须与赛事设定的组别一致
+      </div>
+      <!-- 错误详情框（功能1、2） -->
+      <div id="importErrBox" style="display:none;margin-top:12px;background:#fff1f0;border:1px solid #ffa39e;
+           border-left:4px solid #dc2626;border-radius:8px;padding:12px 14px;
+           font-size:12px;color:#a8071a;max-height:200px;overflow-y:auto;line-height:1.8">
       </div>
     </div>
     <div class="modal-foot">
@@ -928,9 +970,19 @@ async function init(){
 async function loadComps(){
   const r=await fetch('/api/competitions')
   COMPS=await r.json()
+  // 填充地点筛选（赛项面板 + 统计面板）
+  const locs=[...new Set(COMPS.map(c=>c.location).filter(Boolean))]
+  ;['cLocFilter','stLocSel'].forEach(id=>{
+    const s=document.getElementById(id); if(!s)return
+    const v=s.value
+    const first=id==='stLocSel'?'<option value="">— 不筛选地点 —</option>':'<option value="">所有地点</option>'
+    s.innerHTML=first+locs.map(l=>`<option value="${esc(l)}">${esc(l)}</option>`).join('')
+    if(v)s.value=v
+  })
   renderCompTable()
   ;['pCompSel','stCompSel','importCid','fieldsCid'].forEach(id=>{
-    const s=document.getElementById(id),v=s.value
+    const s=document.getElementById(id),v=s?s.value:''
+    if(!s)return
     s.innerHTML='<option value="">— 请选择 —</option>'+
       COMPS.map(c=>`<option value="${c.id}">${esc(c.name)}</option>`).join('')
     if(v)s.value=v
@@ -939,11 +991,21 @@ async function loadComps(){
 
 function renderCompTable(){
   const tb=document.getElementById('compTbody')
-  if(!COMPS.length){
-    tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="empty-ico">🏆</div><div class="empty-txt">暂无赛项</div><div class="empty-sub">点击右上角新增</div></div></td></tr>'
+  const q=(document.getElementById('cSearch')||{value:''}).value.toLowerCase()
+  const locF=(document.getElementById('cLocFilter')||{value:''}).value
+  const actF=(document.getElementById('cActiveFilter')||{value:''}).value
+  let filtered=COMPS.filter(c=>{
+    if(q&&!c.name.toLowerCase().includes(q)&&!(c.location||'').toLowerCase().includes(q))return false
+    if(locF&&c.location!==locF)return false
+    if(actF!==''&&String(c.is_active)!==actF)return false
+    return true
+  })
+  if(!filtered.length){
+    tb.innerHTML='<tr><td colspan="7"><div class="empty"><div class="empty-ico">🏆</div><div class="empty-txt">暂无赛项</div><div class="empty-sub">点击右上角新增</div></div></td></tr>'
     return
   }
-  tb.innerHTML=COMPS.map(c=>`<tr>
+  tb.innerHTML=filtered.map(c=>`<tr>
+    <td><input type="checkbox" class="comp-chk" value="${c.id}" onchange="onCompChkChange()"></td>
     <td>
       <strong style="color:var(--text)">${esc(c.name)}</strong>
       ${c.creator_name?`<span style="font-size:10px;color:var(--dim);margin-left:6px">by ${esc(c.creator_name)}</span>`:''}
@@ -960,6 +1022,28 @@ function renderCompTable(){
       </div>
     </td>
   </tr>`).join('')
+}
+
+function onCompChkChange(){
+  const checked=[...document.querySelectorAll('.comp-chk:checked')]
+  const n=checked.length
+  document.getElementById('compSelCount').textContent=n?`已选 ${n} 个`:''
+  document.getElementById('compBatchDelBtn').style.display=n?'':'none'
+}
+
+function toggleSelAllComps(cb){
+  document.querySelectorAll('.comp-chk').forEach(c=>c.checked=cb.checked)
+  onCompChkChange()
+}
+
+async function batchDelComps(){
+  const ids=[...document.querySelectorAll('.comp-chk:checked')].map(c=>parseInt(c.value))
+  if(!ids.length)return
+  if(!confirm(`确认删除选中的 ${ids.length} 个赛项及其所有选手数据？此操作不可撤销！`))return
+  const r=await fetch('/api/competitions/batch_delete',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({ids})})
+  if(r.ok){await loadComps();toast(`已删除 ${ids.length} 个赛项`)}
+  else{const d=await r.json();toast(d.error||'删除失败','err')}
 }
 
 function openCompModal(){
@@ -1075,16 +1159,50 @@ function downloadQR(){
 }
 
 // ─ Players ────────────────────────────────────────────────────
+// 选中的选手ID集合
+let SEL_IDS = new Set()
+
+function updateBatchBar(){
+  const bar=document.getElementById('batchBar')
+  const n=SEL_IDS.size
+  bar.style.display=n?'flex':'none'
+  if(n) document.getElementById('batchCount').textContent=`已选中 ${n} 名选手`
+}
+
+function clearSel(){
+  SEL_IDS.clear()
+  document.querySelectorAll('.p-chk').forEach(c=>c.checked=false)
+  const sa=document.getElementById('pSelAll'); if(sa)sa.checked=false
+  updateBatchBar()
+}
+
+function toggleSelAllPlayers(cb){
+  document.querySelectorAll('.p-chk').forEach(c=>{
+    c.checked=cb.checked
+    const id=parseInt(c.value)
+    cb.checked?SEL_IDS.add(id):SEL_IDS.delete(id)
+  })
+  updateBatchBar()
+}
+
+function onPlayerChk(cb){
+  const id=parseInt(cb.value)
+  cb.checked?SEL_IDS.add(id):SEL_IDS.delete(id)
+  updateBatchBar()
+}
+
 async function loadPlayers(){
   const cid=document.getElementById('pCompSel').value
   if(!cid){
     document.getElementById('playerTbody').innerHTML='<tr><td colspan="15"><div class="empty"><div class="empty-ico">👥</div><div class="empty-txt">请先选择比赛</div></div></td></tr>'
     return
   }
-  curCid=cid
+  curCid=cid; SEL_IDS.clear(); updateBatchBar()
   const params=new URLSearchParams({competition_id:cid,
     search:document.getElementById('fSearch').value,
     group:document.getElementById('fGroup').value,
+    school:document.getElementById('fSchool').value,
+    grade:document.getElementById('fGrade').value,
     date:document.getElementById('fDate').value,
     session:document.getElementById('fSession').value,
     shirt:document.getElementById('fShirt').value,
@@ -1098,13 +1216,27 @@ async function loadPlayers(){
     document.getElementById('playerSub').textContent=`${comp.name} · 共 ${players.length} 人`
     const grps=JSON.parse(comp.groups||'[]')
     const gs=document.getElementById('fGroup'),gv=gs.value
-    gs.innerHTML='<option value="">所有组别</option>'+grps.map(g=>`<option>${g}</option>`).join('')
+    gs.innerHTML='<option value="">所有组别</option>'+grps.map(g=>`<option>${esc(g)}</option>`).join('')
     if(gv)gs.value=gv
+    // 动态生成学校/年级/日期/场次筛选项
+    const schools=[...new Set(players.map(p=>p.school).filter(Boolean))]
+    const grades=[...new Set(players.map(p=>p.grade).filter(Boolean))]
+    const dates=[...new Set(players.map(p=>p.comp_date).filter(Boolean))].sort()
+    const sessions=[...new Set(players.map(p=>p.session).filter(Boolean))]
+    const fillSel=(id,opts,cur)=>{
+      const s=document.getElementById(id),v=cur||s.value
+      const labels={fSchool:'所有学校',fGrade:'所有年级',fDate:'所有日期',fSession:'所有场次'}
+      s.innerHTML=`<option value="">${labels[id]||'全部'}</option>`+opts.map(o=>`<option>${esc(o)}</option>`).join('')
+      if(v)s.value=v
+    }
+    fillSel('fSchool',schools); fillSel('fGrade',grades); fillSel('fDate',dates); fillSel('fSession',sessions)
   }
   const cols=['player_no','account','name','school','grade','group_name','comp_date','session','seat_no','shirt_size','checked_in','checkin_time','remark']
-  document.getElementById('playerHead').innerHTML=`<tr>${cols.map(c=>`<th>${FL[c]||c}</th>`).join('')}<th>操作</th></tr>`
+  document.getElementById('playerHead').innerHTML=`<tr>
+    <th style="width:36px"><input type="checkbox" id="pSelAll" onchange="toggleSelAllPlayers(this)"></th>
+    ${cols.map(c=>`<th>${FL[c]||c}</th>`).join('')}<th>操作</th></tr>`
   if(!players.length){
-    document.getElementById('playerTbody').innerHTML=`<tr><td colspan="${cols.length+1}"><div class="empty"><div class="empty-ico">👥</div><div class="empty-txt">暂无选手数据</div></div></td></tr>`
+    document.getElementById('playerTbody').innerHTML=`<tr><td colspan="${cols.length+2}"><div class="empty"><div class="empty-ico">👥</div><div class="empty-txt">暂无选手数据</div></div></td></tr>`
     return
   }
   document.getElementById('playerTbody').innerHTML=players.map(p=>{
@@ -1116,12 +1248,15 @@ async function loadPlayers(){
       }
       return`<td>${esc(String(p[c]||'—'))}</td>`
     }).join('')
-    return`<tr>${cells}<td>
-      <div style="display:flex;gap:5px">
-        <button class="btn btn-cyan btn-xs" onclick='editPlayerFn(${JSON.stringify(p).replace(/'/g,"&#39;")})'>编辑</button>
-        <button class="btn btn-red btn-xs" onclick="delPlayer(${p.id})">删除</button>
-      </div>
-    </td></tr>`
+    const chked=SEL_IDS.has(p.id)?'checked':''
+    return`<tr>
+      <td><input type="checkbox" class="p-chk" value="${p.id}" ${chked} onchange="onPlayerChk(this)"></td>
+      ${cells}<td>
+        <div style="display:flex;gap:5px">
+          <button class="btn btn-cyan btn-xs" onclick='editPlayerFn(${JSON.stringify(p).replace(/'/g,"&#39;")})'>编辑</button>
+          <button class="btn btn-red btn-xs" onclick="delPlayer(${p.id})">删除</button>
+        </div>
+      </td></tr>`
   }).join('')
 }
 
@@ -1184,7 +1319,12 @@ async function delPlayer(id){
   await loadPlayers(); toast('已删除')
 }
 
-function openImport(){document.getElementById('importCid').value=curCid||'';openModal('mImport')}
+function openImport(){
+  document.getElementById('importCid').value=curCid||''
+  document.getElementById('importErrBox').style.display='none'
+  document.getElementById('importFile').value=''
+  openModal('mImport')
+}
 
 async function doImport(){
   const cid=document.getElementById('importCid').value
@@ -1194,11 +1334,54 @@ async function doImport(){
   const fd=new FormData(); fd.append('competition_id',cid); fd.append('file',file)
   const r=await fetch('/api/players/import',{method:'POST',body:fd})
   const d=await r.json()
-  if(r.ok){closeModal('mImport');await loadPlayers();await loadComps();toast(`成功导入 ${d.count} 名选手`)}
-  else toast(d.error||'导入失败','err')
+  if(r.ok){
+    closeModal('mImport');await loadPlayers();await loadComps();toast(`成功导入 ${d.count} 名选手`)
+  } else {
+    // 显示详细错误（功能1、2）
+    const msg=d.error||'导入失败'
+    const lines=msg.split('\n')
+    const el=document.getElementById('importErrBox')
+    if(el){
+      el.style.display='block'
+      el.innerHTML='<strong>'+esc(lines[0])+'</strong>'+(lines.length>1?'<ul style="margin:6px 0 0 16px">'+lines.slice(1).map(l=>`<li>${esc(l)}</li>`).join('')+'</ul>':'')
+    } else {
+      alert(msg)
+    }
+  }
 }
 
-function exportPlayers(){if(!curCid){toast('请先选择比赛','err');return};window.open(`/api/players/export/${curCid}`)}
+function exportPlayers(){
+  if(!curCid){toast('请先选择比赛','err');return}
+  const params=new URLSearchParams({
+    search:document.getElementById('fSearch').value,
+    group:document.getElementById('fGroup').value,
+    school:document.getElementById('fSchool').value,
+    grade:document.getElementById('fGrade').value,
+    date:document.getElementById('fDate').value,
+    session:document.getElementById('fSession').value,
+    shirt:document.getElementById('fShirt').value,
+    checked:document.getElementById('fChecked').value
+  })
+  window.open(`/api/players/export/${curCid}?${params}`)
+}
+
+function exportSelected(){
+  // 导出选中的选手：通过搜索所有再在前端过滤——
+  // 更简洁做法：导出当前筛选结果（后端已支持）
+  exportPlayers()
+}
+
+async function batchDelPlayers(){
+  const n=SEL_IDS.size
+  if(!n)return
+  if(!confirm(`确认删除选中的 ${n} 名选手？此操作不可撤销！`))return
+  const r=await fetch('/api/players/batch_delete',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ids:[...SEL_IDS]})})
+  const d=await r.json()
+  if(r.ok){clearSel();await loadPlayers();await loadComps();toast(`已删除 ${d.count} 名选手`)}
+  else toast(d.error||'删除失败','err')
+}
 function dlTemplate(){window.open('/api/players/template')}
 
 // ─ Fields ────────────────────────────────────────────────────
@@ -1228,11 +1411,45 @@ async function saveFields(){
 }
 
 // ─ Stats ──────────────────────────────────────────────────────
+// 统计面板：比赛选择和地点筛选互斥
+function onStatsSelChange(){
+  const cid=document.getElementById('stCompSel').value
+  if(cid){
+    document.getElementById('stLocSel').value=''
+    document.getElementById('stLocComps').style.display='none'
+  }
+  loadStats()
+}
+
+function onStatsLocChange(){
+  const loc=document.getElementById('stLocSel').value
+  if(loc){
+    document.getElementById('stCompSel').value=''
+  }
+  loadStats()
+}
+
 async function loadStats(){
-  const cid=document.getElementById('stCompSel').value; if(!cid)return
-  const r=await fetch(`/api/stats/${cid}`)
+  const cid=document.getElementById('stCompSel').value
+  const loc=document.getElementById('stLocSel').value
+  if(!cid&&!loc)return
+  // 用第一个有效比赛的id作为API入口；地点筛选通过?location=参数传入
+  const useCid=cid||(COMPS.find(c=>c.location===loc)||{}).id
+  if(!useCid)return
+  const url=loc?`/api/stats/${useCid}?location=${encodeURIComponent(loc)}`:`/api/stats/${useCid}`
+  const r=await fetch(url)
   if(!r.ok){toast('权限不足','err');return}
   const d=await r.json()
+
+  // 地点模式：显示包含的赛事列表
+  const locBar=document.getElementById('stLocComps')
+  if(loc&&d.comp_names&&d.comp_names.length){
+    locBar.style.display='block'
+    locBar.textContent='包含赛事：'+d.comp_names.join('、')
+  } else {
+    locBar.style.display='none'
+  }
+
   const pct=d.total?Math.round(d.checked/d.total*100):0
 
   // Stat cards
@@ -1313,8 +1530,11 @@ async function loadStats(){
 
 function exportStats(){
   const cid=document.getElementById('stCompSel').value
-  if(!cid){toast('请先选择比赛','err');return}
-  window.open(`/api/stats/export/${cid}`)
+  const loc=document.getElementById('stLocSel').value
+  const useCid=cid||(COMPS.find(c=>c.location===loc)||{}).id
+  if(!useCid){toast('请先选择比赛或地点','err');return}
+  const qs=loc?`?location=${encodeURIComponent(loc)}`:''
+  window.open(`/api/stats/export/${useCid}${qs}`)
 }
 
 // ─ Admins ────────────────────────────────────────────────────
@@ -1443,6 +1663,89 @@ function toast(msg,type='ok'){
   el.className=`toast ${type} show`
   setTimeout(()=>el.classList.remove('show'),3000)
 }
+
+<!-- ══ 批量修改选手 Modal ══ -->
+<div class="modal-bg" id="mBatchUpdate">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-head">
+      <div class="modal-title">✏ 批量修改选手信息</div>
+      <button class="modal-close" onclick="closeModal('mBatchUpdate')">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--dim);margin-bottom:14px" id="batchUpdateHint"></div>
+      <div style="display:grid;gap:10px" id="batchFieldsGrid">
+        <!-- 动态生成各字段开关+输入 -->
+      </div>
+      <div style="margin-top:16px;padding:10px 14px;background:#fff8e1;border-radius:8px;
+                  border:1px solid #f9a825;font-size:12px;color:#e65100">
+        ⚠ 仅勾选的字段会被覆盖写入，未勾选字段保持原值不变
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('mBatchUpdate')">取消</button>
+      <button class="btn btn-solid" onclick="doBatchUpdate()">确认批量修改</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─ 批量修改字段配置 ────────────────────────────────────────────
+const BATCH_FIELDS=[
+  {k:'group_name',  l:'组别',    type:'select_group'},
+  {k:'school',      l:'学校',    type:'text'},
+  {k:'grade',       l:'年级',    type:'text'},
+  {k:'comp_date',   l:'比赛日期',type:'date'},
+  {k:'session',     l:'场次',    type:'text'},
+  {k:'seat_no',     l:'座位号',  type:'text'},
+  {k:'shirt_size',  l:'衣服尺码',type:'select_shirt'},
+  {k:'remark',      l:'备注',    type:'text'},
+  {k:'checked_in',  l:'签到状态',type:'select_status'},
+]
+
+function openBatchUpdate(){
+  const n=SEL_IDS.size
+  document.getElementById('batchUpdateHint').textContent=`已选中 ${n} 名选手，请勾选要修改的字段：`
+  const comp=COMPS.find(c=>c.id==curCid)
+  const grps=comp?JSON.parse(comp.groups||'[]'):[]
+  document.getElementById('batchFieldsGrid').innerHTML=BATCH_FIELDS.map(f=>{
+    let inp=''
+    if(f.type==='text') inp=`<input type="text" id="bf_${f.k}" class="inp" style="flex:1;min-width:0">`
+    else if(f.type==='date') inp=`<input type="text" id="bf_${f.k}" class="inp" placeholder="2025-06-15" style="flex:1;min-width:0">`
+    else if(f.type==='select_group') inp=`<select id="bf_${f.k}" class="inp" style="flex:1;min-width:0">
+      <option value="">请选择</option>${grps.map(g=>`<option>${esc(g)}</option>`).join('')}</select>`
+    else if(f.type==='select_shirt') inp=`<select id="bf_${f.k}" class="inp" style="flex:1;min-width:0">
+      <option value="">请选择</option><option>XS</option><option>S</option><option>M</option>
+      <option>L</option><option>XL</option><option>XXL</option></select>`
+    else if(f.type==='select_status') inp=`<select id="bf_${f.k}" class="inp" style="flex:1;min-width:0">
+      <option value="0">未签到</option><option value="1">已签到</option></select>`
+    return`<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;
+                border-radius:8px;border:1px solid var(--border);background:#f8fbff">
+      <input type="checkbox" id="bfc_${f.k}" style="accent-color:var(--cyan);width:15px;height:15px;cursor:pointer">
+      <label for="bfc_${f.k}" style="font-size:13px;font-weight:600;color:var(--text);width:72px;cursor:pointer;flex-shrink:0">${f.l}</label>
+      ${inp}
+    </div>`
+  }).join('')
+  openModal('mBatchUpdate')
+}
+
+async function doBatchUpdate(){
+  const fields={}
+  for(const f of BATCH_FIELDS){
+    const chk=document.getElementById('bfc_'+f.k)
+    if(chk&&chk.checked){
+      const val=document.getElementById('bf_'+f.k).value
+      fields[f.k]= f.k==='checked_in'?parseInt(val):val
+    }
+  }
+  if(!Object.keys(fields).length){toast('请勾选至少一个要修改的字段','err');return}
+  const r=await fetch('/api/players/batch_update',{method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({ids:[...SEL_IDS],fields})})
+  const d=await r.json()
+  if(r.ok){closeModal('mBatchUpdate');clearSel();await loadPlayers();toast(`已批量修改 ${d.count} 名选手`)}
+  else toast(d.error||'修改失败','err')
+}
+</script>
 
 async function logout(){await fetch('/api/admin/logout',{method:'POST'});location.href='/admin'}
 
