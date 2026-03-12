@@ -242,7 +242,10 @@ body::before{
 
     <div class="hero">
       <div class="hero-brand">
-        <div class="brand-logo">I</div>
+        <div class="brand-logo" style="background:transparent;border:2px solid rgba(255,255,255,.6);padding:3px">
+          <img src="/static/logo.png" style="width:100%;height:100%;object-fit:contain;border-radius:8px"
+               onerror="this.style.display='none';this.parentElement.innerHTML='I'" alt="logo">
+        </div>
         <div class="brand-txt">
           <div class="brand-name">ICODE</div>
           <div class="brand-sub">ADMIN CONSOLE</div>
