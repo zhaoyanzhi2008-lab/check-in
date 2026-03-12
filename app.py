@@ -44,6 +44,10 @@ def init_db():
         start_time TEXT DEFAULT '',
         end_time TEXT DEFAULT '',
         description TEXT DEFAULT '',
+        description_images TEXT DEFAULT '[]',
+        album_url TEXT DEFAULT '',
+        manager_name TEXT DEFAULT '',
+        comp_admins TEXT DEFAULT '[]',
         banner_text TEXT DEFAULT '欢迎参加ICode比赛',
         banner_color TEXT DEFAULT '#1a6fa8',
         banner_accent TEXT DEFAULT '#0099cc',
@@ -81,6 +85,17 @@ def init_db():
         checkin_time TEXT DEFAULT (datetime('now','localtime'))
     );
     ''')
+    # 兼容旧数据库：自动补充新字段
+    for col, default in [
+        ('description_images', "'[]'"),
+        ('album_url', "''"),
+        ('manager_name', "''"),
+        ('comp_admins', "'[]'"),
+    ]:
+        try:
+            c.execute(f"ALTER TABLE competitions ADD COLUMN {col} TEXT DEFAULT {default}")
+        except Exception:
+            pass
     # default main admin
     if not c.execute("SELECT id FROM admins WHERE is_main=1").fetchone():
         c.execute("INSERT INTO admins(name,phone,password,is_main,permissions) VALUES(?,?,?,1,?)",
@@ -141,10 +156,16 @@ def can(admin, perm):
 def admin_owns_comp(admin, comp_id):
     if admin['is_main']: return True
     conn = db()
-    comp = conn.execute("SELECT created_by FROM competitions WHERE id=?", (comp_id,)).fetchone()
+    comp = conn.execute("SELECT created_by, comp_admins FROM competitions WHERE id=?", (comp_id,)).fetchone()
     conn.close()
     if not comp: return False
-    return comp['created_by'] == admin['id']
+    if comp['created_by'] == admin['id']: return True
+    try:
+        for ca in json.loads(comp['comp_admins'] or '[]'):
+            if ca.get('admin_id') == admin['id']: return True
+    except Exception:
+        pass
+    return False
 
 # ═══════════════════════════════════════════════════════════════════
 # PUBLIC PLAYER ROUTES
@@ -162,7 +183,7 @@ def player_comp(cid):
 def pub_competition(cid):
     conn = db()
     c = conn.execute(
-        "SELECT id,name,description,banner_text,banner_color,banner_accent,groups,"
+        "SELECT id,name,description,description_images,album_url,banner_text,banner_color,banner_accent,groups,"
         "display_fields,query_field,query_hint,location,start_time,end_time "
         "FROM competitions WHERE id=? AND is_active=1", (cid,)).fetchone()
     conn.close()
@@ -308,18 +329,21 @@ def create_competition():
     if not d.get('name'): return jsonify({'error': '请填写赛事名称'}), 400
     conn = db()
     conn.execute("""INSERT INTO competitions(name,location,start_time,end_time,description,
+                    description_images,album_url,manager_name,comp_admins,
                     banner_text,banner_color,banner_accent,groups,display_fields,
-                    query_field,query_hint,is_active,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
-                 (d['name'], d.get('location', ''), d.get('start_time', ''), d.get('end_time', ''),
-                  d.get('description', ''),
-                  d.get('banner_text', '欢迎参加ICode比赛'),
-                  d.get('banner_color', '#1a6fa8'),
-                  d.get('banner_accent', '#0099cc'),
-                  json.dumps(d.get('groups', []), ensure_ascii=False),
-                  json.dumps(d.get('display_fields', ['name','school','group_name','session','seat_no','shirt_size']), ensure_ascii=False),
-                  d.get('query_field', 'player_no,account'),
-                  d.get('query_hint', '请输入报名编号或选手账号'),
-                  d.get('is_active', 1), session['admin_id']))
+                    query_field,query_hint,is_active,created_by) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                 (d['name'], d.get('location',''), d.get('start_time',''), d.get('end_time',''),
+                  d.get('description',''),
+                  json.dumps(d.get('description_images',[]), ensure_ascii=False),
+                  d.get('album_url',''), d.get('manager_name',''),
+                  json.dumps(d.get('comp_admins',[]), ensure_ascii=False),
+                  d.get('banner_text','欢迎参加ICode比赛'),
+                  d.get('banner_color','#1a6fa8'), d.get('banner_accent','#0099cc'),
+                  json.dumps(d.get('groups',[]), ensure_ascii=False),
+                  json.dumps(d.get('display_fields',['name','school','group_name','session','seat_no','shirt_size']), ensure_ascii=False),
+                  d.get('query_field','player_no,account'),
+                  d.get('query_hint','请输入报名编号或选手账号'),
+                  d.get('is_active',1), session['admin_id']))
     conn.commit(); conn.close()
     return jsonify({'success': True})
 
@@ -340,15 +364,19 @@ def update_competition(cid):
     d = request.json or {}
     conn = db()
     conn.execute("""UPDATE competitions SET name=?,location=?,start_time=?,end_time=?,
-                    description=?,banner_text=?,banner_color=?,banner_accent=?,groups=?,
+                    description=?,description_images=?,album_url=?,manager_name=?,comp_admins=?,
+                    banner_text=?,banner_color=?,banner_accent=?,groups=?,
                     display_fields=?,query_field=?,query_hint=?,is_active=? WHERE id=?""",
-                 (d.get('name'), d.get('location', ''), d.get('start_time', ''), d.get('end_time', ''),
-                  d.get('description', ''), d.get('banner_text', ''),
-                  d.get('banner_color', '#1a6fa8'), d.get('banner_accent', '#0099cc'),
-                  json.dumps(d.get('groups', []), ensure_ascii=False),
-                  json.dumps(d.get('display_fields', []), ensure_ascii=False),
-                  d.get('query_field', 'player_no,account'),
-                  d.get('query_hint', ''), d.get('is_active', 1), cid))
+                 (d.get('name'), d.get('location',''), d.get('start_time',''), d.get('end_time',''),
+                  d.get('description',''),
+                  json.dumps(d.get('description_images',[]), ensure_ascii=False),
+                  d.get('album_url',''), d.get('manager_name',''),
+                  json.dumps(d.get('comp_admins',[]), ensure_ascii=False),
+                  d.get('banner_text',''), d.get('banner_color','#1a6fa8'), d.get('banner_accent','#0099cc'),
+                  json.dumps(d.get('groups',[]), ensure_ascii=False),
+                  json.dumps(d.get('display_fields',[]), ensure_ascii=False),
+                  d.get('query_field','player_no,account'),
+                  d.get('query_hint',''), d.get('is_active',1), cid))
     conn.commit(); conn.close()
     return jsonify({'success': True})
 
@@ -364,6 +392,79 @@ def delete_competition(cid):
     conn.commit(); conn.close()
     return jsonify({'success': True})
 
+# ── 功能5：批量导入赛事 ──────────────────────────────────────────
+@app.route('/api/competitions/import', methods=['POST'])
+@admin_required
+def import_competitions():
+    a = get_me()
+    if not can(a, 'add_competition'): return jsonify({'error': '无权限'}), 403
+    upload = request.files.get('file')
+    if not upload: return jsonify({'error': '请上传文件'}), 400
+    wb = openpyxl.load_workbook(upload, data_only=True)
+    ws = wb.active
+    hdrs = [str(c.value).strip().rstrip('*').strip() if c.value else '' for c in ws[1]]
+    col_map = {
+        '赛事名称':'name','地点':'location','开始时间':'start_time','结束时间':'end_time',
+        '欢迎语':'banner_text','背景色':'banner_color','强调色':'banner_accent',
+        '组别':'groups','赛事说明':'description','云相册链接':'album_url',
+        '负责人':'manager_name','查询字段':'query_field','查询提示':'query_hint','是否上线':'is_active',
+    }
+    conn = db(); cnt = 0; warnings = []
+    for row_i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if not any(row): continue
+        d = {}
+        for i, h in enumerate(hdrs):
+            if h in col_map and i < len(row):
+                d[col_map[h]] = str(row[i]).strip() if row[i] is not None else ''
+        if not d.get('name'):
+            warnings.append(f'第{row_i}行：赛事名称为空，已跳过'); continue
+        grps = [g.strip() for g in d.get('groups','').split(',') if g.strip()]
+        is_active = 0 if d.get('is_active','') in ('0','否','下线','no') else 1
+        conn.execute("""INSERT INTO competitions
+            (name,location,start_time,end_time,description,album_url,manager_name,
+             banner_text,banner_color,banner_accent,groups,display_fields,
+             query_field,query_hint,is_active,created_by)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (d.get('name',''), d.get('location',''), d.get('start_time',''), d.get('end_time',''),
+             d.get('description',''), d.get('album_url',''), d.get('manager_name',''),
+             d.get('banner_text','欢迎参加ICode比赛'),
+             d.get('banner_color','#1a6fa8'), d.get('banner_accent','#0099cc'),
+             json.dumps(grps, ensure_ascii=False),
+             '["name","school","group_name","session","seat_no","shirt_size"]',
+             d.get('query_field','player_no,account'),
+             d.get('query_hint','请输入报名编号或选手账号'),
+             is_active, session['admin_id']))
+        cnt += 1
+    conn.commit(); conn.close()
+    return jsonify({'success': True, 'count': cnt, 'warnings': warnings})
+
+@app.route('/api/competitions/template')
+@admin_required
+def competition_template():
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = '赛事导入模板'
+    hdr_fill = PatternFill("solid", fgColor="E8F4FF")
+    req_fill = PatternFill("solid", fgColor="FFE8E0")
+    bold = Font(bold=True, name='微软雅黑', size=10)
+    center = Alignment(horizontal='center', vertical='center')
+    hdrs = ['赛事名称*','地点','开始时间','结束时间','欢迎语','背景色','强调色',
+            '组别','赛事说明','云相册链接','负责人','查询字段','查询提示','是否上线']
+    ws.append(hdrs)
+    for i, cell in enumerate(ws[1]):
+        cell.fill = req_fill if '*' in hdrs[i] else hdr_fill
+        cell.font = bold; cell.alignment = center
+    ws.append(['2025 Code The Future全国大赛', '北京·国家会议中心', '2025-06-15 08:30',
+               '2025-06-16 17:00', '欢迎参加比赛', '#1a6fa8', '#0099cc',
+               '初级组,中级组,高级组', '请凭报名编号完成签到',
+               'https://album.example.com/', '张老师', 'player_no,account',
+               '请输入报名编号或账号', '1'])
+    for col in ws.columns:
+        ws.column_dimensions[col[0].column_letter].width = 20
+    ws.row_dimensions[1].height = 22
+    out = io.BytesIO(); wb.save(out); out.seek(0)
+    return send_file(out,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True, download_name='赛事导入模板.xlsx')
+
 # ═══════════════════════════════════════════════════════════════════
 # PLAYERS
 # ═══════════════════════════════════════════════════════════════════
@@ -378,15 +479,16 @@ def list_players():
     q = "SELECT * FROM players WHERE competition_id=?"
     params = [cid]
     for f, col in [('group', 'group_name'), ('date', 'comp_date'),
-                   ('session', 'session'), ('shirt', 'shirt_size')]:
+                   ('session', 'session'), ('shirt', 'shirt_size'),
+                   ('school', 'school'), ('grade', 'grade')]:
         v = request.args.get(f, '')
         if v: q += f" AND {col}=?"; params.append(v)
     checked = request.args.get('checked', '')
     if checked != '': q += " AND checked_in=?"; params.append(int(checked))
     search = request.args.get('search', '').strip()
     if search:
-        q += " AND (name LIKE ? OR player_no LIKE ? OR account LIKE ?)"
-        params.extend([f'%{search}%'] * 3)
+        q += " AND (name LIKE ? OR player_no LIKE ? OR account LIKE ? OR school LIKE ?)"
+        params.extend([f'%{search}%'] * 4)
     q += " ORDER BY id"
     conn = db()
     rows = conn.execute(q, params).fetchall()
@@ -438,35 +540,177 @@ def import_players():
     a = get_me()
     if not can(a, 'import_players'): return jsonify({'error': '无权限'}), 403
     cid = request.form.get('competition_id')
-    f = request.files.get('file')
-    if not cid or not f: return jsonify({'error': '参数缺失'}), 400
-    wb = openpyxl.load_workbook(f, data_only=True)
+    upload = request.files.get('file')
+    if not cid or not upload: return jsonify({'error': '参数缺失'}), 400
+
+    conn = db()
+    # 取赛事合法组别列表
+    comp_row = conn.execute("SELECT groups FROM competitions WHERE id=?", (cid,)).fetchone()
+    if not comp_row: conn.close(); return jsonify({'error': '赛事不存在'}), 404
+    valid_groups = json.loads(comp_row['groups'] or '[]')   # e.g. ["初级组","中级组"]
+    # 已存在的 player_no / account（非空）
+    exist_nos  = set(r[0] for r in conn.execute(
+        "SELECT player_no FROM players WHERE competition_id=? AND player_no!=''", (cid,)).fetchall())
+    exist_accs = set(r[0] for r in conn.execute(
+        "SELECT account  FROM players WHERE competition_id=? AND account!=''",   (cid,)).fetchall())
+
+    wb = openpyxl.load_workbook(upload, data_only=True)
     ws = wb.active
-    hdrs = [str(c.value).strip() if c.value else '' for c in ws[1]]
+    hdrs = [str(c.value).strip().rstrip('*').strip() if c.value else '' for c in ws[1]]
     fm = {'报名编号':'player_no','账号':'account','姓名':'name','学校':'school',
           '年级':'grade','组别':'group_name','比赛日期':'comp_date','场次':'session',
           '座位号':'seat_no','衣服尺码':'shirt_size','备注':'remark'}
-    conn = db(); cnt = 0
-    for row in ws.iter_rows(min_row=2, values_only=True):
+
+    errors = []   # 收集所有错误行
+    to_insert = []
+    # 文件内去重集合（防止同一文件里重复）
+    file_nos  = set()
+    file_accs = set()
+
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         if not any(row): continue
-        pd = {fm[hdrs[i]]: str(row[i]) if row[i] is not None else ''
-              for i, h in enumerate(hdrs) if h in fm and i < len(row)}
-        if not pd.get('name'): continue
+        pdata = {}
+        for i, h in enumerate(hdrs):
+            if h in fm and i < len(row):
+                pdata[fm[h]] = str(row[i]).strip() if row[i] is not None else ''
+        if not pdata.get('name'): continue
+
+        row_errors = []
+        pno  = pdata.get('player_no', '')
+        pacc = pdata.get('account', '')
+        grp  = pdata.get('group_name', '')
+
+        # ── 功能1：重复检测 ──────────────────────────────────
+        if pno:
+            if pno in exist_nos or pno in file_nos:
+                row_errors.append(f'报名编号"{pno}"重复')
+            else:
+                file_nos.add(pno)
+        if pacc:
+            if pacc in exist_accs or pacc in file_accs:
+                row_errors.append(f'报名账号"{pacc}"重复')
+            else:
+                file_accs.add(pacc)
+
+        # ── 功能2：组别校验 ──────────────────────────────────
+        if valid_groups and grp and grp not in valid_groups:
+            row_errors.append(f'组别"{grp}"不在赛事组别{valid_groups}中，请修改后重新导入')
+
+        if row_errors:
+            errors.append({'row': row_idx, 'name': pdata.get('name',''), 'errors': row_errors})
+        else:
+            to_insert.append(pdata)
+
+    # 有任何错误 → 全部不导入，返回详细错误列表
+    if errors:
+        conn.close()
+        msgs = []
+        for e in errors:
+            msgs.append(f"第{e['row']}行「{e['name']}」：{'；'.join(e['errors'])}")
+        return jsonify({
+            'success': False,
+            'error': '导入失败，请修正以下问题后重新导入：\n' + '\n'.join(msgs),
+            'error_rows': errors
+        }), 400
+
+    # 全部通过 → 批量插入
+    cnt = 0
+    for pdata in to_insert:
         conn.execute("""INSERT INTO players(competition_id,player_no,account,name,school,grade,
                         group_name,comp_date,session,seat_no,shirt_size,remark) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
-                     (cid, pd.get('player_no',''), pd.get('account',''), pd.get('name',''),
-                      pd.get('school',''), pd.get('grade',''), pd.get('group_name',''),
-                      pd.get('comp_date',''), pd.get('session',''), pd.get('seat_no',''),
-                      pd.get('shirt_size',''), pd.get('remark','')))
+                     (cid, pdata.get('player_no',''), pdata.get('account',''), pdata.get('name',''),
+                      pdata.get('school',''), pdata.get('grade',''), pdata.get('group_name',''),
+                      pdata.get('comp_date',''), pdata.get('session',''), pdata.get('seat_no',''),
+                      pdata.get('shirt_size',''), pdata.get('remark','')))
         cnt += 1
     conn.commit(); conn.close()
     return jsonify({'success': True, 'count': cnt})
 
+# ── 功能3：批量删除 ──────────────────────────────────────────────
+@app.route('/api/players/batch_delete', methods=['POST'])
+@admin_required
+def batch_delete_players():
+    d = request.json or {}
+    ids = d.get('ids', [])
+    if not ids: return jsonify({'error': '未选择选手'}), 400
+    a = get_me()
+    conn = db()
+    # 鉴权：所有id都属于该管理员有权限的赛事
+    for pid in ids:
+        p = conn.execute("SELECT competition_id FROM players WHERE id=?", (pid,)).fetchone()
+        if p and not admin_owns_comp(a, p['competition_id']):
+            conn.close(); return jsonify({'error': '无权限'}), 403
+    placeholders = ','.join('?' * len(ids))
+    conn.execute(f"DELETE FROM players WHERE id IN ({placeholders})", ids)
+    conn.commit(); conn.close()
+    return jsonify({'success': True, 'count': len(ids)})
+
+# ── 功能3：批量修改 ──────────────────────────────────────────────
+@app.route('/api/players/batch_update', methods=['POST'])
+@admin_required
+def batch_update_players():
+    d = request.json or {}
+    ids    = d.get('ids', [])
+    fields = d.get('fields', {})   # e.g. {"group_name":"高级组","session":"下午场"}
+    if not ids:   return jsonify({'error': '未选择选手'}), 400
+    if not fields: return jsonify({'error': '未指定修改字段'}), 400
+    allowed = {'player_no','account','name','school','grade','group_name',
+               'comp_date','session','seat_no','shirt_size','remark','checked_in','checkin_time'}
+    safe = {k: v for k, v in fields.items() if k in allowed}
+    if not safe: return jsonify({'error': '没有合法字段'}), 400
+    a = get_me()
+    conn = db()
+    for pid in ids:
+        p = conn.execute("SELECT competition_id FROM players WHERE id=?", (pid,)).fetchone()
+        if p and not admin_owns_comp(a, p['competition_id']):
+            conn.close(); return jsonify({'error': '无权限'}), 403
+    set_clause = ', '.join(f"{k}=?" for k in safe)
+    vals = list(safe.values())
+    placeholders = ','.join('?' * len(ids))
+    conn.execute(f"UPDATE players SET {set_clause} WHERE id IN ({placeholders})",
+                 vals + ids)
+    conn.commit(); conn.close()
+    return jsonify({'success': True, 'count': len(ids)})
+
+# ── 功能3：赛事批量删除 ──────────────────────────────────────────
+@app.route('/api/competitions/batch_delete', methods=['POST'])
+@admin_required
+def batch_delete_competitions():
+    a = get_me()
+    d = request.json or {}
+    ids = d.get('ids', [])
+    if not ids: return jsonify({'error': '未选择赛事'}), 400
+    conn = db()
+    for cid in ids:
+        if not admin_owns_comp(a, cid):
+            conn.close(); return jsonify({'error': '无权限'}), 403
+    placeholders = ','.join('?' * len(ids))
+    conn.execute(f"DELETE FROM checkin_logs WHERE competition_id IN ({placeholders})", ids)
+    conn.execute(f"DELETE FROM players WHERE competition_id IN ({placeholders})", ids)
+    conn.execute(f"DELETE FROM competitions WHERE id IN ({placeholders})", ids)
+    conn.commit(); conn.close()
+    return jsonify({'success': True})
+
+# ── 功能3：带筛选的选手导出 ──────────────────────────────────────
 @app.route('/api/players/export/<int:cid>')
 @admin_required
 def export_players(cid):
     conn = db()
-    players = conn.execute("SELECT * FROM players WHERE competition_id=?", (cid,)).fetchall()
+    # 支持筛选参数导出（功能3）
+    q = "SELECT * FROM players WHERE competition_id=?"
+    params = [cid]
+    for f, col in [('group', 'group_name'), ('date', 'comp_date'),
+                   ('session', 'session'), ('shirt', 'shirt_size'), ('school', 'school'), ('grade', 'grade')]:
+        v = request.args.get(f, '')
+        if v: q += f" AND {col}=?"; params.append(v)
+    checked = request.args.get('checked', '')
+    if checked != '': q += " AND checked_in=?"; params.append(int(checked))
+    search = request.args.get('search', '').strip()
+    if search:
+        q += " AND (name LIKE ? OR player_no LIKE ? OR account LIKE ? OR school LIKE ?)"
+        params.extend([f'%{search}%'] * 4)
+    q += " ORDER BY id"
+    players = conn.execute(q, params).fetchall()
     comp = conn.execute("SELECT name FROM competitions WHERE id=?", (cid,)).fetchone()
     conn.close()
     wb = openpyxl.Workbook(); ws = wb.active; ws.title = '选手信息'
@@ -527,33 +771,73 @@ def player_template():
 # STATISTICS
 # ═══════════════════════════════════════════════════════════════════
 
+# ── 功能4：赛事地点列表（供统计筛选用）────────────────────────
+@app.route('/api/competitions/locations')
+@admin_required
+def competition_locations():
+    a = get_me()
+    conn = db()
+    if a['is_main']:
+        rows = conn.execute("SELECT DISTINCT location FROM competitions WHERE location!='' ORDER BY location").fetchall()
+    else:
+        rows = conn.execute("SELECT DISTINCT location FROM competitions WHERE location!='' AND created_by=? ORDER BY location",
+                            (a['id'],)).fetchall()
+    conn.close()
+    return jsonify([r['location'] for r in rows])
+
 @app.route('/api/stats/<int:cid>')
 @admin_required
 def stats(cid):
     a = get_me()
     if not admin_owns_comp(a, cid): return jsonify({'error': '无权限'}), 403
+    # 功能4：支持按地点筛选（location 筛选的是赛事列表层，这里支持跨赛事按地点汇总）
+    location = request.args.get('location', '').strip()
     conn = db()
-    total = conn.execute("SELECT COUNT(*) FROM players WHERE competition_id=?", (cid,)).fetchone()[0]
-    chk = conn.execute("SELECT COUNT(*) FROM players WHERE competition_id=? AND checked_in=1", (cid,)).fetchone()[0]
-    by_session = conn.execute("""SELECT comp_date,session,COUNT(*) total,SUM(checked_in) checked
-        FROM players WHERE competition_id=? GROUP BY comp_date,session ORDER BY comp_date,session""", (cid,)).fetchall()
-    by_group = conn.execute("""SELECT group_name,COUNT(*) total,SUM(checked_in) checked
-        FROM players WHERE competition_id=? GROUP BY group_name ORDER BY total DESC""", (cid,)).fetchall()
-    by_shirt = conn.execute("""SELECT shirt_size,COUNT(*) total FROM players
-        WHERE competition_id=? GROUP BY shirt_size ORDER BY total DESC""", (cid,)).fetchall()
-    by_date = conn.execute("""SELECT comp_date,COUNT(*) total,SUM(checked_in) checked
-        FROM players WHERE competition_id=? GROUP BY comp_date ORDER BY comp_date""", (cid,)).fetchall()
-    recent = conn.execute("""SELECT p.name,p.group_name,p.session,l.checkin_time
-        FROM checkin_logs l JOIN players p ON l.player_id=p.id
-        WHERE l.competition_id=? ORDER BY l.checkin_time DESC LIMIT 10""", (cid,)).fetchall()
+
+    if location:
+        # 找出该地点下当前管理员有权限的所有赛事id
+        if a['is_main']:
+            cid_rows = conn.execute("SELECT id FROM competitions WHERE location=?", (location,)).fetchall()
+        else:
+            cid_rows = conn.execute("SELECT id FROM competitions WHERE location=? AND created_by=?",
+                                    (location, a['id'])).fetchall()
+        cids = [r['id'] for r in cid_rows]
+        if not cids:
+            conn.close()
+            return jsonify({'total':0,'checked':0,'unchecked':0,'by_session':[],'by_group':[],
+                            'by_shirt':[],'by_date':[],'recent':[],'location':location,'comp_names':[]})
+        ph = ','.join('?'*len(cids))
+        where = f"competition_id IN ({ph})"
+        p = cids
+        comp_names = [r['name'] for r in conn.execute(f"SELECT name FROM competitions WHERE id IN ({ph})", cids).fetchall()]
+    else:
+        where = "competition_id=?"
+        p = [cid]
+        comp_names = []
+
+    total = conn.execute(f"SELECT COUNT(*) FROM players WHERE {where}", p).fetchone()[0]
+    chk   = conn.execute(f"SELECT COUNT(*) FROM players WHERE {where} AND checked_in=1", p).fetchone()[0]
+    by_session = conn.execute(f"""SELECT comp_date,session,COUNT(*) total,SUM(checked_in) checked
+        FROM players WHERE {where} GROUP BY comp_date,session ORDER BY comp_date,session""", p).fetchall()
+    by_group = conn.execute(f"""SELECT group_name,COUNT(*) total,SUM(checked_in) checked
+        FROM players WHERE {where} GROUP BY group_name ORDER BY total DESC""", p).fetchall()
+    by_shirt = conn.execute(f"""SELECT shirt_size,COUNT(*) total FROM players
+        WHERE {where} GROUP BY shirt_size ORDER BY total DESC""", p).fetchall()
+    by_date  = conn.execute(f"""SELECT comp_date,COUNT(*) total,SUM(checked_in) checked
+        FROM players WHERE {where} GROUP BY comp_date ORDER BY comp_date""", p).fetchall()
+    recent   = conn.execute(f"""SELECT pl.name,pl.group_name,pl.session,l.checkin_time
+        FROM checkin_logs l JOIN players pl ON l.player_id=pl.id
+        WHERE l.{where} ORDER BY l.checkin_time DESC LIMIT 10""", p).fetchall()
     conn.close()
     return jsonify({
         'total': total, 'checked': chk, 'unchecked': total - chk,
         'by_session': [dict(r) for r in by_session],
-        'by_group': [dict(r) for r in by_group],
-        'by_shirt': [dict(r) for r in by_shirt],
-        'by_date': [dict(r) for r in by_date],
-        'recent': [dict(r) for r in recent],
+        'by_group':   [dict(r) for r in by_group],
+        'by_shirt':   [dict(r) for r in by_shirt],
+        'by_date':    [dict(r) for r in by_date],
+        'recent':     [dict(r) for r in recent],
+        'location':   location,
+        'comp_names': comp_names,
     })
 
 @app.route('/api/stats/export/<int:cid>')
@@ -660,7 +944,7 @@ def delete_admin(aid):
 if __name__ == '__main__':
     init_db()
     print("\n" + "="*55)
-    print("  🚀 ICode 签到管理系统 v3.0  — Code Planet")
+    print("  🚀 ICode 签到管理系统 v3.2  — 批量操作版")
     print("  选手签到: http://localhost:5000/")
     print("  管理后台: http://localhost:5000/admin")
     print("  账号: admin  密码: admin123")

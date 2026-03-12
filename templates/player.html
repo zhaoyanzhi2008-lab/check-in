@@ -116,8 +116,8 @@ body::before{
 
 /* Top nav */
 .banner-nav{
-  display:flex;align-items:center;justify-content:space-between;
-  margin-bottom:20px;
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:20px;gap:16px;
 }
 .brand{display:flex;align-items:center;gap:10px}
 .brand-logo{
@@ -136,8 +136,9 @@ body::before{
   font-family:'Orbitron',sans-serif;
   font-size:14px;font-weight:900;
   color:#fff;letter-spacing:2px;
+  text-align:center;
 }
-.brand-sub{font-size:10px;color:rgba(255,255,255,.65);letter-spacing:1px;margin-top:2px}
+.brand-sub{font-size:10px;color:rgba(255,255,255,.65);letter-spacing:1px;margin-top:2px;text-align:center;}
 
 /* Live indicator */
 .live-dot{
@@ -647,7 +648,10 @@ tr.tr-sel td{background:rgba(0,153,204,.04)}
   <div class="banner-inner">
     <div class="banner-nav">
       <div class="brand">
-        <div class="brand-logo">I</div>
+        <div class="brand-logo">
+          <!-- 替换为您的logo图片: <img src="/static/logo.png" style="width:100%;height:100%;object-fit:contain;border-radius:8px"> -->
+          I
+        </div>
         <div class="brand-info">
           <div class="brand-name">ICODE</div>
           <div class="brand-sub">COMPETITION · CHECK-IN</div>
@@ -678,15 +682,25 @@ tr.tr-sel td{background:rgba(0,153,204,.04)}
   <div class="notice-text" id="noticeText"></div>
 </div>
 
+<!-- 云相册按钮 -->
+<div id="albumBtn" style="display:none;margin:10px 14px 0;padding:11px 18px;
+     background:linear-gradient(135deg,#0088bb,#00aadd);border-radius:12px;
+     align-items:center;gap:10px;cursor:pointer;
+     box-shadow:0 2px 10px rgba(0,136,187,.3);transition:opacity .2s"
+     onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+  <span style="font-size:20px">📸</span>
+  <div>
+    <div style="font-weight:700;color:#fff;font-size:14px">云相册</div>
+    <div style="font-size:11px;color:rgba(255,255,255,.75)">点击查看比赛照片</div>
+  </div>
+  <span style="margin-left:auto;color:rgba(255,255,255,.8);font-size:18px">›</span>
+</div>
+
 <!-- Content -->
 <div class="content">
   <!-- Query card -->
   <div class="card">
-    <div class="card-head">
-      <div class="ch-icon">⚡</div>
-      <span class="ch-title">选手签到</span>
-    </div>
-    <div class="card-body">
+    <div class="card-body" style="padding-top:18px">
       <div class="query-hint" id="queryHint">
         <strong>输入报名编号或选手账号</strong>完成签到
       </div>
@@ -700,7 +714,7 @@ tr.tr-sel td{background:rgba(0,153,204,.04)}
         <div class="tip-dot"></div>
         <span>多人签到：用空格分隔，如 IC001 IC002 IC003</span>
       </div>
-      <button class="btn-query" id="queryBtn" onclick="doQuery()">SEARCH</button>
+      <button class="btn-query" id="queryBtn" onclick="doQuery()">查 询</button>
     </div>
   </div>
 
@@ -712,7 +726,7 @@ tr.tr-sel td{background:rgba(0,153,204,.04)}
     </div>
     <div id="resContent"></div>
     <button class="btn-checkin" id="checkinBtn" onclick="doCheckin()" disabled>
-      SELECT PLAYERS TO CHECK IN
+      请先选择要签到的选手
     </button>
   </div>
 </div>
@@ -728,7 +742,7 @@ tr.tr-sel td{background:rgba(0,153,204,.04)}
     感谢参赛！祝您在本次 ICode 大赛中<br>充分展示才华，取得优异成绩！
     <div class="wish-icons">🏆 🚀 💻</div>
   </div>
-  <button class="btn-again" onclick="resetAll()">CONTINUE</button>
+  <button class="btn-again" onclick="resetAll()">退 出</button>
 </div>
 
 <!-- Loading -->
@@ -813,16 +827,32 @@ function applyTheme(){
   } else {
     document.getElementById('bannerTitle').textContent=title
   }
-  // Meta
+  // Meta：地点 + 日期单独一行
   const metas=[]
-  if(COMP.start_time)metas.push({e:'📅',t:COMP.start_time.slice(0,10)})
   if(COMP.location)metas.push({e:'📍',t:COMP.location})
+  if(COMP.start_time){
+    const dateStr=COMP.start_time.slice(0,10)
+    const endDate=COMP.end_time?(COMP.end_time.slice(0,10)!==dateStr?' ~ '+COMP.end_time.slice(0,10):''):''
+    metas.push({e:'📅',t:dateStr+endDate})
+  }
   document.getElementById('bannerMeta').innerHTML=metas.map(m=>
     `<div class="meta-badge">${m.e} ${esc(m.t)}</div>`).join('')
-  // Notice
-  if(COMP.description){
-    document.getElementById('noticeText').textContent=COMP.description
+  // Notice：说明文字 + 图片
+  if(COMP.description||COMP.description_images){
+    const imgs=JSON.parse(COMP.description_images||'[]')
+    let html=''
+    if(COMP.description) html+=`<div>${esc(COMP.description)}</div>`
+    if(imgs.length) html+=imgs.map(u=>`<img src="${u}" style="max-width:100%;border-radius:8px;margin-top:8px;display:block" onerror="this.style.display='none'">`).join('')
+    document.getElementById('noticeText').innerHTML=html
     document.getElementById('notice').classList.add('show')
+  }
+  // 云相册按钮
+  const albumBtn=document.getElementById('albumBtn')
+  if(COMP.album_url){
+    albumBtn.style.display='flex'
+    albumBtn.onclick=()=>window.open(COMP.album_url,'_blank')
+  } else {
+    albumBtn.style.display='none'
   }
   if(COMP.query_hint){
     document.getElementById('queryHint').innerHTML=`<strong>${esc(COMP.query_hint)}</strong>`
@@ -953,13 +983,13 @@ function toggleRow(id){
 function updateBtn(){
   const btn=document.getElementById('checkinBtn'),n=selIds.size
   btn.disabled=n===0
-  btn.textContent=n>0?`CONFIRM CHECK IN  ( ${n} )  →`:'SELECT PLAYERS TO CHECK IN'
+  btn.textContent=n>0?`确认签到  ( ${n} 人 )  ✓`:'请先选择要签到的选手'
 }
 
 async function doCheckin(){
   if(!selIds.size)return
   const btn=document.getElementById('checkinBtn')
-  btn.disabled=true;btn.textContent='PROCESSING...'
+  btn.disabled=true;btn.textContent='处理中...'
   try{
     const res=await fetch('/api/pub/checkin',{method:'POST',
       headers:{'Content-Type':'application/json'},
