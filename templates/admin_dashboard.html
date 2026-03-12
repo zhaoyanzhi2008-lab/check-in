@@ -754,12 +754,16 @@ tbody tr:last-child td{border-bottom:none}
     <div class="modal-head"><div class="modal-title" id="mCompT">新增赛项</div><button class="modal-close" onclick="closeModal('mComp')">×</button></div>
     <div class="modal-body">
       <div class="fg c2">
-        <div class="ff"><label>赛事名称 *</label><input id="cName" placeholder="2025 ICode全国大赛"></div>
+        <div class="ff"><label>赛事名称 *</label><input id="cName" placeholder="2025 Code The Future"></div>
         <div class="ff"><label>赛事地点</label><input id="cLoc" placeholder="北京·国家会议中心"></div>
       </div>
       <div class="fg c2">
         <div class="ff"><label>开始时间</label><input type="datetime-local" id="cStart"></div>
         <div class="ff"><label>结束时间</label><input type="datetime-local" id="cEnd"></div>
+      </div>
+      <div class="fg c2">
+        <div class="ff"><label>负责人</label><input id="cManager" placeholder="张老师"></div>
+        <div class="ff"><label>云相册链接（选手签到页显示入口）</label><input id="cAlbum" placeholder="https://...（无则留空）"></div>
       </div>
       <div class="fg">
         <div class="ff"><label>Banner 欢迎语</label><input id="cBanner" placeholder="欢迎参加ICode比赛"></div>
@@ -779,7 +783,14 @@ tbody tr:last-child td{border-bottom:none}
         </div>
       </div>
       <div class="fg">
-        <div class="ff"><label>赛事说明</label><textarea id="cDesc" rows="3" placeholder="比赛说明、注意事项..."></textarea></div>
+        <div class="ff"><label>赛事说明（文字）</label><textarea id="cDesc" rows="3" placeholder="比赛说明、注意事项..."></textarea></div>
+      </div>
+      <div class="fg">
+        <div class="ff">
+          <label>赛事说明图片（每行一个图片链接，最多5张）</label>
+          <textarea id="cDescImages" rows="3" placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.jpg"></textarea>
+          <span class="hint">图片显示在说明文字下方，填图片直链URL</span>
+        </div>
       </div>
       <div class="fg">
         <div class="ff"><label>组别（逗号分隔）</label><input id="cGroups" placeholder="初级组,中级组,高级组"></div>
@@ -796,6 +807,12 @@ tbody tr:last-child td{border-bottom:none}
         <div class="ff">
           <label>签到页显示字段</label>
           <div class="chips" id="cFieldChips" style="margin-top:4px"></div>
+        </div>
+      </div>
+      <div class="fg">
+        <div class="ff">
+          <label>分配子管理员权限</label>
+          <div id="compAdminList" style="display:grid;gap:6px;margin-top:6px;max-height:180px;overflow-y:auto"></div>
         </div>
       </div>
       <div class="fg">
