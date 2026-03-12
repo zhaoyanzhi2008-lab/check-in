@@ -429,30 +429,42 @@ def import_competitions():
     hdrs = [str(c.value).strip().rstrip('*').strip() if c.value else '' for c in ws[1]]
     col_map = {
         '赛事名称':'name','地点':'location','开始时间':'start_time','结束时间':'end_time',
-        '欢迎语':'banner_text','背景色':'banner_color','强调色':'banner_accent',
-        '组别':'groups','赛事说明':'description','云相册链接':'album_url',
+        '欢迎语':'banner_text','组别':'groups','赛事说明':'description','云相册链接':'album_url',
         '负责人':'manager_name','查询字段':'query_field','查询提示':'query_hint','是否上线':'is_active',
+        '子管理员手机号':'sub_phones','子管理员权限':'sub_perms',
     }
     conn = db(); cnt = 0; warnings = []
     for row_i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
         if not any(row): continue
         d = {}
-        for i, h in enumerate(hdrs):
-            if h in col_map and i < len(row):
-                d[col_map[h]] = str(row[i]).strip() if row[i] is not None else ''
+        for i, hdr_name in enumerate(hdrs):
+            if hdr_name in col_map and i < len(row):
+                d[col_map[hdr_name]] = str(row[i]).strip() if row[i] is not None else ''
         if not d.get('name'):
             warnings.append(f'第{row_i}行：赛事名称为空，已跳过'); continue
         grps = [g.strip() for g in d.get('groups','').split(',') if g.strip()]
         is_active = 0 if d.get('is_active','') in ('0','否','下线','no') else 1
+        # 解析子管理员
+        comp_admins = []
+        phones = [p.strip() for p in d.get('sub_phones','').split(',') if p.strip()]
+        perms  = [p.strip() for p in d.get('sub_perms','').split(',') if p.strip()]
+        for idx, phone in enumerate(phones):
+            adm = conn.execute("SELECT id FROM admins WHERE phone=?", (phone,)).fetchone()
+            if adm:
+                perm = perms[idx] if idx < len(perms) else 'view'
+                perm = 'edit' if perm == 'edit' else 'view'
+                comp_admins.append({'admin_id': adm['id'], 'perm': perm})
+            else:
+                warnings.append(f'第{row_i}行：手机号 {phone} 未找到对应管理员，已忽略')
         conn.execute("""INSERT INTO competitions
-            (name,location,start_time,end_time,description,album_url,manager_name,
+            (name,location,start_time,end_time,description,album_url,manager_name,comp_admins,
              banner_text,banner_color,banner_accent,groups,display_fields,
              query_field,query_hint,is_active,created_by)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (d.get('name',''), d.get('location',''), d.get('start_time',''), d.get('end_time',''),
              d.get('description',''), d.get('album_url',''), d.get('manager_name',''),
-             d.get('banner_text','欢迎参加ICode比赛'),
-             d.get('banner_color','#1a6fa8'), d.get('banner_accent','#0099cc'),
+             json.dumps(comp_admins, ensure_ascii=False),
+             d.get('banner_text','欢迎参加ICode比赛'), '#1a6fa8', '#0099cc',
              json.dumps(grps, ensure_ascii=False),
              '["name","school","group_name","session","seat_no","shirt_size"]',
              d.get('query_field','player_no,account'),
@@ -468,21 +480,32 @@ def competition_template():
     wb = openpyxl.Workbook(); ws = wb.active; ws.title = '赛事导入模板'
     hdr_fill = PatternFill("solid", fgColor="E8F4FF")
     req_fill = PatternFill("solid", fgColor="FFE8E0")
+    note_fill = PatternFill("solid", fgColor="FFF8E1")
     bold = Font(bold=True, name='微软雅黑', size=10)
     center = Alignment(horizontal='center', vertical='center')
-    hdrs = ['赛事名称*','地点','开始时间','结束时间','欢迎语','背景色','强调色',
-            '组别','赛事说明','云相册链接','负责人','查询字段','查询提示','是否上线']
+    hdrs = ['赛事名称*','地点','开始时间','结束时间','欢迎语',
+            '组别','赛事说明','云相册链接','负责人','查询字段','查询提示','是否上线',
+            '子管理员手机号','子管理员权限']
     ws.append(hdrs)
     for i, cell in enumerate(ws[1]):
         cell.fill = req_fill if '*' in hdrs[i] else hdr_fill
         cell.font = bold; cell.alignment = center
     ws.append(['2025 Code The Future全国大赛', '北京·国家会议中心', '2025-06-15 08:30',
-               '2025-06-16 17:00', '欢迎参加比赛', '#1a6fa8', '#0099cc',
+               '2025-06-16 17:00', '欢迎参加比赛',
                '初级组,中级组,高级组', '请凭报名编号完成签到',
                'https://album.example.com/', '张老师', 'player_no,account',
-               '请输入报名编号或账号', '1'])
+               '请输入报名编号或账号', '1',
+               '13800000001,13800000002', 'view,edit'])
+    # 说明行
+    note_row = ['子管理员手机号：逗号分隔多个手机号', '', '', '', '', '', '', '', '', '', '', '',
+                '多个手机号逗号分隔', '对应权限：view=仅查看，edit=可编辑，数量需与手机号一一对应']
+    ws.append(note_row)
+    for cell in ws[3]:
+        if cell.value:
+            cell.fill = note_fill
+            cell.font = Font(name='微软雅黑', size=9, italic=True, color='856404')
     for col in ws.columns:
-        ws.column_dimensions[col[0].column_letter].width = 20
+        ws.column_dimensions[col[0].column_letter].width = 22
     ws.row_dimensions[1].height = 22
     out = io.BytesIO(); wb.save(out); out.seek(0)
     return send_file(out,
@@ -930,6 +953,87 @@ def export_stats(cid):
 # ADMINS
 # ═══════════════════════════════════════════════════════════════════
 
+
+@app.route('/api/admins/template')
+@admin_required
+def admin_template():
+    a = get_me()
+    if not a['is_main']: return jsonify({'error': '无权限'}), 403
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = '管理员导入模板'
+    hdr_fill = PatternFill("solid", fgColor="E8F4FF")
+    req_fill = PatternFill("solid", fgColor="FFE8E0")
+    bold = Font(bold=True, name='微软雅黑', size=10)
+    center = Alignment(horizontal='center', vertical='center')
+    hdrs = ['姓名*','手机号*','初始密码*','新增赛事','导入选手','查看统计','人员管理']
+    ws.append(hdrs)
+    for i, cell in enumerate(ws[1]):
+        cell.fill = req_fill if '*' in hdrs[i] else hdr_fill
+        cell.font = bold; cell.alignment = center
+    ws.append(['张老师','13800000001','abc123','是','是','是','否'])
+    ws.append(['李老师','13800000002','abc123','否','否','是','否'])
+    note_fill = PatternFill("solid", fgColor="FFF8E1")
+    note = ['权限列填"是"或"1"表示开启，其余表示关闭','','','新增赛事','导入选手','查看统计','人员管理']
+    ws.append(note)
+    for cell in ws[3]:
+        if cell.value:
+            cell.fill = note_fill
+            cell.font = Font(name='微软雅黑', size=9, italic=True, color='856404')
+    for col in ws.columns:
+        ws.column_dimensions[col[0].column_letter].width = 18
+    out = io.BytesIO(); wb.save(out); out.seek(0)
+    return send_file(out,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True, download_name='管理员导入模板.xlsx')
+
+@app.route('/api/admins/import', methods=['POST'])
+@admin_required
+def import_admins():
+    a = get_me()
+    if not a['is_main']: return jsonify({'error': '无权限'}), 403
+    upload = request.files.get('file')
+    if not upload: return jsonify({'error': '请上传文件'}), 400
+    wb = openpyxl.load_workbook(upload, data_only=True)
+    ws = wb.active
+    hdrs = [str(c.value).strip().rstrip('*').strip() if c.value else '' for c in ws[1]]
+    perm_map = {'新增赛事':'add_competition','导入选手':'import_players',
+                '查看统计':'checkin_stats','人员管理':'manage_admins'}
+    conn = db(); cnt = 0; warnings = []
+    for row_i, row in enumerate(ws.iter_rows(min_row=2, values_only=True), start=2):
+        if not any(row): continue
+        d = dict(zip(hdrs, [str(v).strip() if v is not None else '' for v in row]))
+        name = d.get('姓名','').strip()
+        phone = d.get('手机号','').strip()
+        pwd = d.get('初始密码','').strip()
+        if not name or not phone or not pwd:
+            warnings.append(f'第{row_i}行：姓名/手机号/密码不能为空，已跳过'); continue
+        if len(pwd) < 6:
+            warnings.append(f'第{row_i}行：{name} 密码少于6位，已跳过'); continue
+        perms = {}
+        for col, key in perm_map.items():
+            val = d.get(col, '')
+            perms[key] = val in ('是','1','yes','true','TRUE','YES')
+        try:
+            conn.execute("INSERT INTO admins(name,phone,password,permissions) VALUES(?,?,?,?)",
+                         (name, phone, sha(pwd), json.dumps(perms, ensure_ascii=False)))
+            cnt += 1
+        except Exception:
+            warnings.append(f'第{row_i}行：手机号 {phone} 已存在，已跳过')
+    conn.commit(); conn.close()
+    return jsonify({'success': True, 'count': cnt, 'warnings': warnings})
+
+@app.route('/api/admins/batch_delete', methods=['POST'])
+@admin_required
+def batch_delete_admins():
+    a = get_me()
+    if not a['is_main']: return jsonify({'error': '无权限'}), 403
+    ids = (request.json or {}).get('ids', [])
+    if not ids: return jsonify({'error': '未选择管理员'}), 400
+    conn = db()
+    ph = ','.join('?'*len(ids))
+    conn.execute(f"DELETE FROM admins WHERE id IN ({ph}) AND is_main=0", ids)
+    conn.commit(); conn.close()
+    return jsonify({'success': True})
+
 @app.route('/api/admins', methods=['GET'])
 @admin_required
 def list_admins():
@@ -984,7 +1088,7 @@ def delete_admin(aid):
 if __name__ == '__main__':
     init_db()
     print("\n" + "="*55)
-    print("  🚀 ICode 签到管理系统 v3.2  — 批量操作版")
+    print("  🚀 ICode 签到管理系统 v3.4")
     print("  选手签到: http://localhost:5001/")
     print("  管理后台: http://localhost:5001/admin")
     print("  账号: admin  密码: admin123")

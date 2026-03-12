@@ -448,13 +448,16 @@ tbody tr:last-child td{border-bottom:none}
 <!-- SIDEBAR -->
 <div class="sidebar" id="sidebar">
   <div class="sb-brand">
-    <div class="sb-logo">
-      <!-- 替换logo: <img src="/static/logo.png" style="width:32px;height:32px;object-fit:contain"> -->
-      I
+    <div class="sb-logo" style="background:transparent;padding:0;overflow:hidden">
+      <img src="/static/logo.png" style="width:38px;height:38px;object-fit:contain"
+           onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"
+           alt="logo">
+      <span style="display:none;width:38px;height:38px;align-items:center;justify-content:center;
+            background:var(--cyan);border-radius:10px;font-weight:900;color:#fff;font-size:18px">I</span>
     </div>
     <div>
       <div class="sb-nm">ICODE</div>
-      <div class="sb-vr">v3.0 · ADMIN</div>
+      <div class="sb-vr">v3.4 · ADMIN</div>
     </div>
   </div>
   <nav class="sb-nav">
@@ -718,12 +721,24 @@ tbody tr:last-child td{border-bottom:none}
     <div class="panel" id="p-admins">
       <div class="card">
         <div class="card-head">
-          <div><div class="card-title">管理员列表</div><div class="card-sub">子管理员只能查看自己创建的赛事数据</div></div>
-          <button class="btn btn-solid btn-sm" onclick="openAdminModal()">＋ 添加</button>
+          <div><div class="card-title">管理员列表</div><div class="card-sub">子管理员只能查看自己被分配的赛事数据</div></div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+            <button class="btn btn-red btn-sm" id="adminBatchDelBtn" style="display:none" onclick="batchDelAdmins()">🗑 批量删除</button>
+            <button class="btn btn-ghost btn-sm" onclick="dlAdminTemplate()">📄 模板</button>
+            <button class="btn btn-cyan btn-sm" onclick="openAdminImport()">📤 批量导入</button>
+            <button class="btn btn-solid btn-sm" onclick="openAdminModal()">＋ 添加</button>
+          </div>
+        </div>
+        <div class="filter-bar">
+          <input type="text" id="adminSearch" placeholder="搜姓名/手机号" oninput="renderAdminTable()" style="width:180px">
+          <span id="adminSelCount" style="font-size:12px;color:var(--dim);margin-left:4px"></span>
         </div>
         <div class="tbl-wrap">
           <table>
-            <thead><tr><th>姓名</th><th>手机号</th><th>角色</th><th>权限</th><th>创建时间</th><th>操作</th></tr></thead>
+            <thead><tr>
+              <th style="width:36px"><input type="checkbox" id="adminSelAll" onchange="toggleSelAllAdmins(this)"></th>
+              <th>姓名</th><th>手机号</th><th>角色</th><th>权限</th><th>创建时间</th><th>操作</th>
+            </tr></thead>
             <tbody id="adminTbody"></tbody>
           </table>
         </div>
@@ -1668,16 +1683,26 @@ function exportStats(){
 }
 
 // ─ Admins ────────────────────────────────────────────────────
+let ADMINS_ALL = []
+
 async function loadAdmins(){
   const r=await fetch('/api/admins'); if(!r.ok)return
-  const admins=await r.json()
-  document.getElementById('adminTbody').innerHTML=admins.map(a=>{
+  ADMINS_ALL=await r.json()
+  renderAdminTable()
+}
+
+function renderAdminTable(){
+  const q=(document.getElementById('adminSearch')||{value:''}).value.toLowerCase()
+  const filtered=ADMINS_ALL.filter(a=>
+    !q||a.name.toLowerCase().includes(q)||a.phone.includes(q))
+  document.getElementById('adminTbody').innerHTML=filtered.map(a=>{
     const perms=JSON.parse(a.permissions||'{}')
     const ptags=a.is_main
       ? '<span class="tag t-orange">全部权限</span>'
       : PERMS.filter(p=>perms[p.k]).map(p=>`<span class="tag t-dim" style="margin:1px">${p.l}</span>`).join('')||
         '<span style="color:var(--dim);font-size:11px">无权限</span>'
     return`<tr>
+      <td>${!a.is_main?`<input type="checkbox" class="admin-chk" value="${a.id}" onchange="onAdminChkChange()">`:''}</td>
       <td><strong>${esc(a.name)}</strong></td>
       <td style="font-family:monospace;font-size:12px">${esc(a.phone)}</td>
       <td><span class="tag ${a.is_main?'t-orange':'t-cyan'}">${a.is_main?'主管理员':'子管理员'}</span></td>
@@ -1689,6 +1714,50 @@ async function loadAdmins(){
       </div>`:'—'}</td>
     </tr>`
   }).join('')
+}
+
+function onAdminChkChange(){
+  const n=document.querySelectorAll('.admin-chk:checked').length
+  document.getElementById('adminSelCount').textContent=n?`已选 ${n} 人`:''
+  document.getElementById('adminBatchDelBtn').style.display=n?'':'none'
+}
+
+function toggleSelAllAdmins(cb){
+  document.querySelectorAll('.admin-chk').forEach(c=>c.checked=cb.checked)
+  onAdminChkChange()
+}
+
+async function batchDelAdmins(){
+  const ids=[...document.querySelectorAll('.admin-chk:checked')].map(c=>parseInt(c.value))
+  if(!ids.length)return
+  if(!confirm(`确认删除选中的 ${ids.length} 名管理员？`))return
+  const r=await fetch('/api/admins/batch_delete',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify({ids})})
+  if(r.ok){await loadAdmins();toast(`已删除 ${ids.length} 名管理员`)}
+  else{const d=await r.json();toast(d.error||'删除失败','err')}
+}
+
+function dlAdminTemplate(){window.open('/api/admins/template')}
+
+function openAdminImport(){
+  document.getElementById('adminImportErrBox').style.display='none'
+  document.getElementById('adminImportFile').value=''
+  openModal('mAdminImport')
+}
+
+async function doAdminImport(){
+  const file=document.getElementById('adminImportFile').files[0]
+  if(!file){toast('请选择文件','err');return}
+  const fd=new FormData(); fd.append('file',file)
+  const r=await fetch('/api/admins/import',{method:'POST',body:fd})
+  const d=await r.json()
+  if(r.ok){
+    closeModal('mAdminImport'); await loadAdmins(); await loadAllAdmins()
+    toast(`成功导入 ${d.count} 名管理员${d.warnings&&d.warnings.length?' · '+d.warnings.length+'行已跳过':''}`)
+  } else {
+    const el=document.getElementById('adminImportErrBox')
+    el.style.display='block'; el.textContent=d.error||'导入失败'
+  }
 }
 
 function openAdminModal(){
@@ -1906,6 +1975,38 @@ init()
       <button class="btn btn-ghost" onclick="dlCompTemplate()">📄 下载模板</button>
       <button class="btn btn-ghost" onclick="closeModal('mCompImport')">取消</button>
       <button class="btn btn-solid" onclick="doCompImport()">开始导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 批量导入管理员 MODAL ══ -->
+<div class="modal-bg" id="mAdminImport">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head">
+      <div class="modal-title">📤 批量导入管理员</div>
+      <button class="modal-close" onclick="closeModal('mAdminImport')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg"><div class="ff">
+        <label>Excel 文件（.xlsx / .xls）</label>
+        <input type="file" id="adminImportFile" accept=".xlsx,.xls"
+          onchange="document.getElementById('adminImportErrBox').style.display='none'"
+          style="background:var(--card3);border:1.5px dashed rgba(0,150,220,.3);border-radius:9px;
+                 padding:14px;cursor:pointer;color:var(--dim)">
+      </div></div>
+      <div style="background:rgba(0,150,220,.04);border:1px solid var(--border);border-radius:9px;
+                  padding:12px;font-size:11px;color:var(--dim);line-height:1.9">
+        📋 请先下载模板，填写姓名、手机号、初始密码及权限后上传<br>
+        必填：<strong style="color:#ff6b6b">姓名、手机号、初始密码</strong>（密码至少6位）
+      </div>
+      <div id="adminImportErrBox" style="display:none;margin-top:10px;background:#fff1f0;
+           border:1px solid #ffa39e;border-left:4px solid #dc2626;border-radius:8px;
+           padding:10px 14px;font-size:12px;color:#a8071a"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="dlAdminTemplate()">📄 下载模板</button>
+      <button class="btn btn-ghost" onclick="closeModal('mAdminImport')">取消</button>
+      <button class="btn btn-solid" onclick="doAdminImport()">开始导入</button>
     </div>
   </div>
 </div>
