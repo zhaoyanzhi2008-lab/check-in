@@ -787,9 +787,17 @@ tbody tr:last-child td{border-bottom:none}
       </div>
       <div class="fg">
         <div class="ff">
-          <label>赛事说明图片（每行一个图片链接，最多5张）</label>
-          <textarea id="cDescImages" rows="3" placeholder="https://example.com/image1.jpg&#10;https://example.com/image2.jpg"></textarea>
-          <span class="hint">图片显示在说明文字下方，填图片直链URL</span>
+          <label>赛事说明图片（最多5张）</label>
+          <div id="descImgPreview" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
+          <label for="cDescImagesFile" style="display:inline-flex;align-items:center;gap:6px;padding:8px 16px;
+            background:#f0f8ff;border:1.5px dashed rgba(0,150,220,.4);border-radius:8px;cursor:pointer;
+            font-size:12px;color:var(--cyan);font-weight:600;transition:background .15s"
+            onmouseover="this.style.background='#e0f0ff'" onmouseout="this.style.background='#f0f8ff'">
+            📷 点击选择图片
+          </label>
+          <input type="file" id="cDescImagesFile" accept="image/*" multiple style="display:none"
+            onchange="onDescImgSelect(this)">
+          <span class="hint">图片显示在说明文字下方，支持 jpg/png/gif，单张建议不超过 2MB</span>
         </div>
       </div>
       <div class="fg">
@@ -1061,6 +1069,48 @@ async function batchDelComps(){
   else{const d=await r.json();toast(d.error||'删除失败','err')}
 }
 
+// ─── 说明图片上传处理 ─────────────────────────────────────────
+let descImgData = []  // 存 base64 字符串数组
+
+function renderDescImgPreview(){
+  const box = document.getElementById('descImgPreview')
+  if(!box) return
+  if(!descImgData.length){ box.innerHTML=''; return }
+  box.innerHTML = descImgData.map((src,i) => `
+    <div style="position:relative;width:80px;height:80px;border-radius:8px;overflow:hidden;
+                border:1.5px solid rgba(0,150,220,.2);flex-shrink:0">
+      <img src="${src}" style="width:100%;height:100%;object-fit:cover">
+      <button onclick="removeDescImg(${i})"
+        style="position:absolute;top:2px;right:2px;width:18px;height:18px;border-radius:50%;
+               background:rgba(0,0,0,.55);color:#fff;border:none;cursor:pointer;
+               font-size:11px;line-height:18px;text-align:center;padding:0">×</button>
+    </div>`).join('')
+}
+
+function removeDescImg(idx){
+  descImgData.splice(idx,1)
+  renderDescImgPreview()
+}
+
+function onDescImgSelect(input){
+  const files = [...input.files]
+  const remain = 5 - descImgData.length
+  if(remain <= 0){ toast('最多上传5张图片','err'); input.value=''; return }
+  const toLoad = files.slice(0, remain)
+  let loaded = 0
+  toLoad.forEach(file => {
+    if(file.size > 3 * 1024 * 1024){ toast(`${file.name} 超过3MB，已跳过`,'err'); loaded++; return }
+    const reader = new FileReader()
+    reader.onload = e => {
+      descImgData.push(e.target.result)
+      loaded++
+      if(loaded === toLoad.length) renderDescImgPreview()
+    }
+    reader.readAsDataURL(file)
+  })
+  input.value = ''
+}
+
 // ─── 子管理员权限分配 ─────────────────────────────────────────
 let ALL_ADMINS=[]
 let compAdminPerms={}
@@ -1137,7 +1187,8 @@ function openCompModal(){
   editComp=null; selDispFields=['name','school','group_name','session','seat_no','shirt_size']
   compAdminPerms={}
   document.getElementById('mCompT').textContent='新增赛项'
-  ;['cName','cLoc','cDesc','cDescImages','cGroups','cAlbum','cManager'].forEach(i=>document.getElementById(i).value='')
+  ;['cName','cLoc','cDesc','cGroups','cAlbum','cManager'].forEach(i=>document.getElementById(i).value='')
+  descImgData=[]; renderDescImgPreview()
   document.getElementById('cBanner').value='欢迎参加ICode比赛'
   document.getElementById('cBgHex').value='#1a6fa8'; document.getElementById('cBgColor').value='#1a6fa8'
   document.getElementById('cAccHex').value='#0088bb'; document.getElementById('cAccColor').value='#0088bb'
@@ -1157,7 +1208,7 @@ async function editCompFn(id){
   document.getElementById('cStart').value=c.start_time||''
   document.getElementById('cEnd').value=c.end_time||''
   document.getElementById('cDesc').value=c.description||''
-  document.getElementById('cDescImages').value=(JSON.parse(c.description_images||'[]')).join('\n')
+  descImgData=JSON.parse(c.description_images||'[]'); renderDescImgPreview()
   document.getElementById('cAlbum').value=c.album_url||''
   document.getElementById('cManager').value=c.manager_name||''
   document.getElementById('cBanner').value=c.banner_text||''
@@ -1194,7 +1245,7 @@ function syncColor(inputId,val){
 async function saveComp(){
   const name=document.getElementById('cName').value.trim()
   if(!name){toast('请填写赛事名称','err');return}
-  const imgs=document.getElementById('cDescImages').value.split('\n').map(s=>s.trim()).filter(Boolean).slice(0,5)
+  const imgs=descImgData.slice(0,5)
   const data={
     name,location:document.getElementById('cLoc').value,
     start_time:document.getElementById('cStart').value,
