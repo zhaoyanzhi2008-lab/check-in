@@ -470,6 +470,7 @@ tbody tr:last-child td{border-bottom:none}
     <div class="sb-section" id="adminSection">
       <div class="sb-sl">SYSTEM</div>
       <div class="sb-item" onclick="nav('admins',this)"><span class="si">🛡</span>人员管理</div>
+      <div class="sb-item" onclick="nav('roles',this)"><span class="si">🎭</span>角色管理</div>
       <div class="sb-item" onclick="nav('changepwd',this)"><span class="si">🔑</span>修改密码</div>
     </div>
   </nav>
@@ -724,6 +725,7 @@ tbody tr:last-child td{border-bottom:none}
           <div><div class="card-title">管理员列表</div><div class="card-sub">子管理员只能查看自己被分配的赛事数据</div></div>
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
             <button class="btn btn-red btn-sm" id="adminBatchDelBtn" style="display:none" onclick="batchDelAdmins()">🗑 批量删除</button>
+            <button class="btn btn-ghost btn-sm" id="adminBatchEditBtn" style="display:none" onclick="openAdminBatchUpdate()">✏ 批量修改</button>
             <button class="btn btn-ghost btn-sm" onclick="dlAdminTemplate()">📄 模板</button>
             <button class="btn btn-cyan btn-sm" onclick="openAdminImport()">📤 批量导入</button>
             <button class="btn btn-solid btn-sm" onclick="openAdminModal()">＋ 添加</button>
@@ -737,7 +739,7 @@ tbody tr:last-child td{border-bottom:none}
           <table>
             <thead><tr>
               <th style="width:36px"><input type="checkbox" id="adminSelAll" onchange="toggleSelAllAdmins(this)"></th>
-              <th>姓名</th><th>手机号</th><th>角色</th><th>权限</th><th>创建时间</th><th>操作</th>
+              <th>姓名</th><th>手机号</th><th>角色</th><th>额外权限</th><th>创建时间</th><th>操作</th>
             </tr></thead>
             <tbody id="adminTbody"></tbody>
           </table>
@@ -745,6 +747,22 @@ tbody tr:last-child td{border-bottom:none}
       </div>
     </div>
 
+
+    <!-- ══ 角色管理 ══ -->
+    <div class="panel" id="p-roles">
+      <div class="card">
+        <div class="card-head">
+          <div><div class="card-title">角色管理</div><div class="card-sub">角色是权限的集合，管理员可继承角色权限</div></div>
+          <button class="btn btn-solid btn-sm" onclick="openRoleModal()">＋ 新增角色</button>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>角色名称</th><th>描述</th><th>包含权限</th><th>使用人数</th><th>创建时间</th><th>操作</th></tr></thead>
+            <tbody id="roleTbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
     <!-- ══ 修改密码 ══ -->
     <div class="panel" id="p-changepwd">
       <div class="card" style="max-width:420px">
@@ -948,7 +966,13 @@ tbody tr:last-child td{border-bottom:none}
         <div class="ff"><label>手机号 *（登录账号）</label><input id="aPhone" placeholder="13800000000"></div>
       </div>
       <div class="fg"><div class="ff"><label>初始密码 *</label><input type="text" id="aPwd" placeholder="设置初始密码（至少6位）"></div></div>
-      <div style="font-size:10px;color:var(--dim);font-family:'Orbitron',sans-serif;letter-spacing:1.5px;margin-bottom:10px;margin-top:4px">PERMISSIONS</div>
+      <div class="fg"><div class="ff">
+        <label>角色（可选，继承角色权限）</label>
+        <select id="aRoleSelect" style="margin-top:4px">
+          <option value="">— 不分配角色（使用下方独立权限）—</option>
+        </select>
+      </div></div>
+      <div style="font-size:10px;color:var(--dim);font-family:'Orbitron',sans-serif;letter-spacing:1.5px;margin-bottom:10px;margin-top:4px">独立权限（叠加在角色权限之上）</div>
       <div class="perm-grid" id="permGrid"></div>
     </div>
     <div class="modal-foot">
@@ -1003,6 +1027,7 @@ async function init(){
   document.getElementById('userAv').textContent=ME.name[0]||'A'
   document.getElementById('userRole').textContent=ME.is_main?'MAIN ADMIN':'SUB ADMIN'
   if(!ME.is_main)document.getElementById('adminSection').style.display='none'
+  await loadRoles()
   await loadAllAdmins()
   await loadComps()
 }
@@ -1682,6 +1707,157 @@ function exportStats(){
   window.open(`/api/stats/export/${useCid}${qs}`)
 }
 
+
+// ─ Roles ─────────────────────────────────────────────────────────
+let ROLES = []
+let editRole = null
+let rolePerms = {}
+
+async function loadRoles(){
+  const r=await fetch('/api/roles'); if(!r.ok)return
+  ROLES=await r.json()
+  renderRoleTable()
+  const opts='<option value="">— 不分配角色 —</option><option value="__clear__">清除角色</option>'+
+    ROLES.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('')
+  ;['aRoleSelect','buAdminRole'].forEach(id=>{
+    const el=document.getElementById(id); if(el) el.innerHTML=opts
+  })
+}
+
+function renderRoleTable(){
+  const tb=document.getElementById('roleTbody'); if(!tb)return
+  if(!ROLES.length){
+    tb.innerHTML='<tr><td colspan="6"><div class="empty"><div class="empty-ico">🎭</div><div class="empty-txt">暂无角色</div><div class="empty-sub">点击右上角新增</div></div></td></tr>'
+    return
+  }
+  tb.innerHTML=ROLES.map(r=>{
+    const perms=JSON.parse(r.permissions||'{}')
+    const ptags=PERMS.filter(p=>perms[p.k]).map(p=>`<span class="tag t-dim" style="margin:1px">${p.l}</span>`).join('')||
+      '<span style="color:var(--dim);font-size:11px">无权限</span>'
+    const userCount=ADMINS_ALL.filter(a=>a.role_id===r.id).length
+    return`<tr>
+      <td><strong style="color:var(--text)">${esc(r.name)}</strong></td>
+      <td style="color:var(--dim);font-size:12px">${esc(r.description)||'—'}</td>
+      <td>${ptags}</td>
+      <td><span class="tag t-cyan">${userCount} 人</span></td>
+      <td style="color:var(--dim);font-size:11px">${(r.created_at||'').slice(0,10)}</td>
+      <td><div style="display:flex;gap:5px">
+        <button class="btn btn-ghost btn-xs" onclick='editRoleFn(${JSON.stringify(r).replace(/'/g,"&#39;")})'>编辑</button>
+        <button class="btn btn-red btn-xs" onclick="delRole(${r.id})">删除</button>
+      </div></td>
+    </tr>`
+  }).join('')
+}
+
+function openRoleModal(){
+  editRole=null; rolePerms={}
+  document.getElementById('mRoleT').textContent='新增角色'
+  ;['rName','rDesc'].forEach(i=>document.getElementById(i).value='')
+  renderRolePermGrid(); openModal('mRole')
+}
+
+function editRoleFn(r){
+  editRole=r; rolePerms=JSON.parse(r.permissions||'{}')
+  document.getElementById('mRoleT').textContent='编辑角色'
+  document.getElementById('rName').value=r.name
+  document.getElementById('rDesc').value=r.description||''
+  renderRolePermGrid(); openModal('mRole')
+}
+
+function renderRolePermGrid(){
+  document.getElementById('rolePermGrid').innerHTML=PERMS.map(p=>`
+    <div class="perm-card${rolePerms[p.k]?' on':''}" onclick="toggleRolePerm('${p.k}',this)">
+      <div class="perm-chk">${rolePerms[p.k]?'✓':''}</div>
+      <span class="perm-lbl">${p.l}</span>
+    </div>`).join('')
+}
+
+function toggleRolePerm(k,el){
+  rolePerms[k]=!rolePerms[k]
+  el.classList.toggle('on',rolePerms[k])
+  el.querySelector('.perm-chk').textContent=rolePerms[k]?'✓':''
+}
+
+async function saveRole(){
+  const name=document.getElementById('rName').value.trim()
+  if(!name){toast('请填写角色名称','err');return}
+  const data={name,permissions:rolePerms,description:document.getElementById('rDesc').value.trim()}
+  const url=editRole?`/api/roles/${editRole.id}`:'/api/roles'
+  const r=await fetch(url,{method:editRole?'PUT':'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+  const d=await r.json()
+  if(r.ok){closeModal('mRole');await loadRoles();await loadAdmins();toast('保存成功')}
+  else toast(d.error||'保存失败','err')
+}
+
+async function delRole(id){
+  const r=ROLES.find(x=>x.id===id)
+  const users=ADMINS_ALL.filter(a=>a.role_id===id).length
+  const msg=users?`该角色有 ${users} 名管理员在使用，删除后将变为无角色状态。确认删除？`:'确认删除该角色？'
+  if(!confirm(msg))return
+  await fetch(`/api/roles/${id}`,{method:'DELETE'})
+  await loadRoles(); await loadAdmins(); toast('角色已删除')
+}
+
+// ─ Admin batch update ─────────────────────────────────────────────
+let buAdminPerms = {}
+
+function openAdminBatchUpdate(){
+  const ids=[...document.querySelectorAll('.admin-chk:checked')].map(c=>parseInt(c.value))
+  if(!ids.length)return
+  document.getElementById('adminBuHint').textContent=`已选 ${ids.length} 名管理员`
+  ;['buAdminRoleChk','buAdminPermChk','buAdminPwdChk'].forEach(id=>document.getElementById(id).checked=false)
+  document.getElementById('buAdminPwd').value=''
+  buAdminPerms={}
+  document.getElementById('buAdminRoleChk').onchange=function(){
+    document.getElementById('buAdminRole').style.opacity=this.checked?'1':'.4'
+    document.getElementById('buAdminRole').style.pointerEvents=this.checked?'auto':'none'
+  }
+  document.getElementById('buAdminPermChk').onchange=function(){
+    document.getElementById('buAdminPermGrid').style.opacity=this.checked?'1':'.5'
+    document.getElementById('buAdminPermGrid').style.pointerEvents=this.checked?'auto':'none'
+  }
+  document.getElementById('buAdminPwdChk').onchange=function(){
+    document.getElementById('buAdminPwd').style.opacity=this.checked?'1':'.5'
+    document.getElementById('buAdminPwd').style.pointerEvents=this.checked?'auto':'none'
+  }
+  document.getElementById('buAdminPermGrid').innerHTML=PERMS.map(p=>`
+    <div class="perm-card" onclick="toggleBuPerm('${p.k}',this)">
+      <div class="perm-chk"></div>
+      <span class="perm-lbl">${p.l}</span>
+    </div>`).join('')
+  openModal('mAdminBatchUpdate')
+}
+
+function toggleBuPerm(k,el){
+  buAdminPerms[k]=!buAdminPerms[k]
+  el.classList.toggle('on',buAdminPerms[k])
+  el.querySelector('.perm-chk').textContent=buAdminPerms[k]?'✓':''
+}
+
+async function doAdminBatchUpdate(){
+  const ids=[...document.querySelectorAll('.admin-chk:checked')].map(c=>parseInt(c.value))
+  if(!ids.length){toast('未选择管理员','err');return}
+  const data={ids}
+  if(document.getElementById('buAdminRoleChk').checked){
+    const v=document.getElementById('buAdminRole').value
+    data.role_id=v==='__clear__'?null:parseInt(v)||null
+  }
+  if(document.getElementById('buAdminPermChk').checked){
+    data.permissions=buAdminPerms
+  }
+  if(document.getElementById('buAdminPwdChk').checked){
+    const pwd=document.getElementById('buAdminPwd').value.trim()
+    if(!pwd||pwd.length<6){toast('密码至少6位','err');return}
+    data.reset_password=pwd
+  }
+  const r=await fetch('/api/admins/batch_update',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+  const d=await r.json()
+  if(r.ok){closeModal('mAdminBatchUpdate');await loadAdmins();toast('批量修改成功')}
+  else toast(d.error||'修改失败','err')
+}
+
 // ─ Admins ────────────────────────────────────────────────────
 let ADMINS_ALL = []
 
@@ -1697,16 +1873,19 @@ function renderAdminTable(){
     !q||a.name.toLowerCase().includes(q)||a.phone.includes(q))
   document.getElementById('adminTbody').innerHTML=filtered.map(a=>{
     const perms=JSON.parse(a.permissions||'{}')
-    const ptags=a.is_main
+    const extraTags=a.is_main
       ? '<span class="tag t-orange">全部权限</span>'
       : PERMS.filter(p=>perms[p.k]).map(p=>`<span class="tag t-dim" style="margin:1px">${p.l}</span>`).join('')||
-        '<span style="color:var(--dim);font-size:11px">无权限</span>'
+        '<span style="color:var(--dim);font-size:11px">—</span>'
+    const roleTag=a.role_name
+      ? `<span class="tag t-cyan" style="font-size:11px">${esc(a.role_name)}</span>`
+      : `<span style="color:var(--dim);font-size:11px">无角色</span>`
     return`<tr>
       <td>${!a.is_main?`<input type="checkbox" class="admin-chk" value="${a.id}" onchange="onAdminChkChange()">`:''}</td>
       <td><strong>${esc(a.name)}</strong></td>
       <td style="font-family:monospace;font-size:12px">${esc(a.phone)}</td>
-      <td><span class="tag ${a.is_main?'t-orange':'t-cyan'}">${a.is_main?'主管理员':'子管理员'}</span></td>
-      <td>${ptags}</td>
+      <td>${roleTag}</td>
+      <td>${extraTags}</td>
       <td style="color:var(--dim);font-size:11px">${(a.created_at||'').slice(0,10)}</td>
       <td>${!a.is_main?`<div style="display:flex;gap:5px">
         <button class="btn btn-ghost btn-xs" onclick='editAdminFn(${JSON.stringify(a).replace(/'/g,"&#39;")})'>编辑</button>
@@ -1720,6 +1899,7 @@ function onAdminChkChange(){
   const n=document.querySelectorAll('.admin-chk:checked').length
   document.getElementById('adminSelCount').textContent=n?`已选 ${n} 人`:''
   document.getElementById('adminBatchDelBtn').style.display=n?'':'none'
+  document.getElementById('adminBatchEditBtn').style.display=n?'':'none'
 }
 
 function toggleSelAllAdmins(cb){
@@ -1773,6 +1953,9 @@ function editAdminFn(a){
   document.getElementById('aName').value=a.name
   document.getElementById('aPhone').value=a.phone
   document.getElementById('aPwd').value=''
+  // 填充角色选择
+  const roleSelect=document.getElementById('aRoleSelect')
+  if(roleSelect) roleSelect.value=a.role_id||''
   renderPermGrid(); openModal('mAdmin')
 }
 
@@ -1795,7 +1978,8 @@ async function saveAdmin(){
   const phone=document.getElementById('aPhone').value.trim()
   const pwd=document.getElementById('aPwd').value.trim()
   if(!editAdmin&&(!name||!phone||!pwd)){toast('请填写完整信息','err');return}
-  const data={name,permissions:adminPerms}
+  const roleId=document.getElementById('aRoleSelect')?parseInt(document.getElementById('aRoleSelect').value)||null:null
+  const data={name,permissions:adminPerms,role_id:roleId}
   if(!editAdmin){data.phone=phone;data.password=pwd}
   if(editAdmin&&pwd)data.password=pwd
   const url=editAdmin?`/api/admins/${editAdmin.id}`:'/api/admins'
@@ -2007,6 +2191,71 @@ init()
       <button class="btn btn-ghost" onclick="dlAdminTemplate()">📄 下载模板</button>
       <button class="btn btn-ghost" onclick="closeModal('mAdminImport')">取消</button>
       <button class="btn btn-solid" onclick="doAdminImport()">开始导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 管理员批量修改 MODAL ══ -->
+<div class="modal-bg" id="mAdminBatchUpdate">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-head">
+      <div class="modal-title">✏ 批量修改管理员</div>
+      <button class="modal-close" onclick="closeModal('mAdminBatchUpdate')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--dim);margin-bottom:14px" id="adminBuHint"></div>
+      <div class="fg">
+        <div class="ff">
+          <label><input type="checkbox" id="buAdminRoleChk" style="margin-right:6px">修改角色</label>
+          <select id="buAdminRole" style="margin-top:6px;width:100%">
+            <option value="">— 不修改 —</option>
+            <option value="__clear__">清除角色（使用独立权限）</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg">
+        <div class="ff">
+          <label><input type="checkbox" id="buAdminPermChk" style="margin-right:6px">覆盖独立权限</label>
+          <div class="perm-grid" id="buAdminPermGrid" style="margin-top:8px;opacity:.5;pointer-events:none"></div>
+        </div>
+      </div>
+      <div class="fg">
+        <div class="ff">
+          <label><input type="checkbox" id="buAdminPwdChk" style="margin-right:6px">重置密码</label>
+          <input type="text" id="buAdminPwd" placeholder="新密码（至少6位）"
+            style="margin-top:6px;opacity:.5;pointer-events:none">
+        </div>
+      </div>
+      <div style="margin-top:12px;padding:10px 14px;background:#fff8e1;border-radius:8px;
+                  border:1px solid #f9a825;font-size:12px;color:#e65100">
+        ⚠ 仅勾选的项目会被修改，未勾选项保持原值不变
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('mAdminBatchUpdate')">取消</button>
+      <button class="btn btn-solid" onclick="doAdminBatchUpdate()">确认批量修改</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 角色 MODAL ══ -->
+<div class="modal-bg" id="mRole">
+  <div class="modal" style="max-width:500px">
+    <div class="modal-head">
+      <div class="modal-title" id="mRoleT">新增角色</div>
+      <button class="modal-close" onclick="closeModal('mRole')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg c2">
+        <div class="ff"><label>角色名称 *</label><input id="rName" placeholder="如：赛事负责人"></div>
+        <div class="ff"><label>描述</label><input id="rDesc" placeholder="简单描述该角色职责"></div>
+      </div>
+      <div style="font-size:10px;color:var(--dim);font-family:'Orbitron',sans-serif;letter-spacing:1.5px;margin:10px 0 8px">PERMISSIONS</div>
+      <div class="perm-grid" id="rolePermGrid"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('mRole')">取消</button>
+      <button class="btn btn-solid" onclick="saveRole()">保存</button>
     </div>
   </div>
 </div>
