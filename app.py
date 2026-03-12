@@ -28,20 +28,14 @@ def now_str():
 def init_db():
     conn = db(); c = conn.cursor()
     c.executescript('''
-    CREATE TABLE IF NOT EXISTS roles (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT UNIQUE NOT NULL,
-        permissions TEXT DEFAULT '{}',
-        description TEXT DEFAULT '',
-        created_at TEXT DEFAULT (datetime('now','localtime'))
-    );
     CREATE TABLE IF NOT EXISTS admins (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT NOT NULL,
         phone TEXT UNIQUE NOT NULL,
         password TEXT NOT NULL,
         is_main INTEGER DEFAULT 0,
-        role_id INTEGER DEFAULT NULL,
+        role_name TEXT DEFAULT '',
+        is_active INTEGER DEFAULT 1,
         permissions TEXT DEFAULT '{}',
         created_at TEXT DEFAULT (datetime('now','localtime'))
     );
@@ -104,23 +98,11 @@ def init_db():
             c.execute(f"ALTER TABLE competitions ADD COLUMN {col} TEXT DEFAULT {default}")
         except Exception:
             pass
-    try:
-        c.execute("ALTER TABLE admins ADD COLUMN role_id INTEGER DEFAULT NULL")
-    except Exception:
-        pass
-    # 预设角色
-    default_roles = [
-        ('赛事负责人', '{"add_competition":true,"import_players":true,"checkin_stats":true}',
-         '可新增赛事、导入选手、查看统计'),
-        ('数据查看员', '{"checkin_stats":true}',
-         '仅可查看统计数据'),
-        ('选手管理员', '{"import_players":true,"checkin_stats":true}',
-         '可导入选手、查看统计'),
-    ]
-    for rname, rperms, rdesc in default_roles:
-        if not c.execute("SELECT id FROM roles WHERE name=?", (rname,)).fetchone():
-            c.execute("INSERT INTO roles(name,permissions,description) VALUES(?,?,?)",
-                      (rname, rperms, rdesc))
+    for col, default in [('role_name',"''"),('is_active','1')]:
+        try:
+            c.execute(f"ALTER TABLE admins ADD COLUMN {col} TEXT DEFAULT {default}")
+        except Exception:
+            pass
     # default main admin
     if not c.execute("SELECT id FROM admins WHERE is_main=1").fetchone():
         c.execute("INSERT INTO admins(name,phone,password,is_main,permissions) VALUES(?,?,?,1,?)",
@@ -170,23 +152,15 @@ def get_me():
     conn = db()
     a = conn.execute("SELECT * FROM admins WHERE id=?", (session['admin_id'],)).fetchone()
     conn.close()
+    if a and not a['is_main'] and not a['is_active']:
+        return None  # 已禁用
     return a
-
-def get_role_perms(role_id):
-    if not role_id: return {}
-    conn = db()
-    r = conn.execute("SELECT permissions FROM roles WHERE id=?", (role_id,)).fetchone()
-    conn.close()
-    return json.loads(r['permissions'] or '{}') if r else {}
 
 def can(admin, perm):
     if not admin: return False
     if admin['is_main']: return True
-    # 先看角色权限，再看个人权限（个人权限可额外追加）
-    role_p = get_role_perms(admin['role_id'] if 'role_id' in admin.keys() else None)
     p = json.loads(admin['permissions'] or '{}')
-    merged = {**role_p, **p}
-    return merged.get('all') or merged.get(perm, False)
+    return p.get('all') or p.get(perm, False)
 
 def comp_perm(admin, comp_id):
     """返回该管理员对指定赛事的权限级别：'edit' / 'view' / None"""
@@ -986,61 +960,6 @@ def export_stats(cid):
 
 
 # ═══════════════════════════════════════════════════════════════════
-# ROLES
-# ═══════════════════════════════════════════════════════════════════
-
-@app.route('/api/roles', methods=['GET'])
-@admin_required
-def list_roles():
-    conn = db()
-    rows = conn.execute("SELECT * FROM roles ORDER BY id").fetchall()
-    conn.close()
-    return jsonify([dict(r) for r in rows])
-
-@app.route('/api/roles', methods=['POST'])
-@admin_required
-def create_role():
-    a = get_me()
-    if not a['is_main']: return jsonify({'error': '无权限'}), 403
-    d = request.json or {}
-    if not d.get('name'): return jsonify({'error': '角色名不能为空'}), 400
-    conn = db()
-    try:
-        conn.execute("INSERT INTO roles(name,permissions,description) VALUES(?,?,?)",
-                     (d['name'], json.dumps(d.get('permissions',{}), ensure_ascii=False),
-                      d.get('description','')))
-        conn.commit()
-    except Exception:
-        conn.close(); return jsonify({'error': '角色名已存在'}), 400
-    conn.close()
-    return jsonify({'success': True})
-
-@app.route('/api/roles/<int:rid>', methods=['PUT'])
-@admin_required
-def update_role(rid):
-    a = get_me()
-    if not a['is_main']: return jsonify({'error': '无权限'}), 403
-    d = request.json or {}
-    conn = db()
-    conn.execute("UPDATE roles SET name=?,permissions=?,description=? WHERE id=?",
-                 (d.get('name',''), json.dumps(d.get('permissions',{}), ensure_ascii=False),
-                  d.get('description',''), rid))
-    conn.commit(); conn.close()
-    return jsonify({'success': True})
-
-@app.route('/api/roles/<int:rid>', methods=['DELETE'])
-@admin_required
-def delete_role(rid):
-    a = get_me()
-    if not a['is_main']: return jsonify({'error': '无权限'}), 403
-    conn = db()
-    # 解绑使用该角色的管理员
-    conn.execute("UPDATE admins SET role_id=NULL WHERE role_id=?", (rid,))
-    conn.execute("DELETE FROM roles WHERE id=?", (rid,))
-    conn.commit(); conn.close()
-    return jsonify({'success': True})
-
-# ═══════════════════════════════════════════════════════════════════
 # ADMINS
 # ═══════════════════════════════════════════════════════════════════
 
@@ -1108,15 +1027,10 @@ def import_admins():
         for col, key in perm_map.items():
             val = d.get(col, '')
             perms[key] = val in ('是','1','yes','true','TRUE','YES')
-        role_id = None
-        role_name = d.get('角色','').strip()
-        if role_name:
-            r = conn.execute("SELECT id FROM roles WHERE name=?", (role_name,)).fetchone()
-            if r: role_id = r['id']
-            else: warnings.append(f'第{row_i}行：角色"{role_name}"不存在，将使用独立权限')
+        role_nm = d.get('角色','').strip()
         try:
-            conn.execute("INSERT INTO admins(name,phone,password,role_id,permissions) VALUES(?,?,?,?,?)",
-                         (name, phone, sha(pwd), role_id, json.dumps(perms, ensure_ascii=False)))
+            conn.execute("INSERT INTO admins(name,phone,password,role_name,permissions) VALUES(?,?,?,?,?)",
+                         (name, phone, sha(pwd), role_nm, json.dumps(perms, ensure_ascii=False)))
             cnt += 1
         except Exception:
             warnings.append(f'第{row_i}行：手机号 {phone} 已存在，已跳过')
@@ -1146,16 +1060,19 @@ def batch_update_admins():
     ids = d.get('ids', [])
     if not ids: return jsonify({'error': '未选择管理员'}), 400
     conn = db()
-    if 'role_id' in d:
-        conn.execute(f"UPDATE admins SET role_id=? WHERE id IN ({','.join('?'*len(ids))}) AND is_main=0",
-                     [d['role_id'] or None] + ids)
+    ph = ','.join('?'*len(ids))
+    if 'role_name' in d:
+        conn.execute(f"UPDATE admins SET role_name=? WHERE id IN ({ph}) AND is_main=0",
+                     [d['role_name']] + ids)
     if 'permissions' in d:
-        conn.execute(f"UPDATE admins SET permissions=? WHERE id IN ({','.join('?'*len(ids))}) AND is_main=0",
+        conn.execute(f"UPDATE admins SET permissions=? WHERE id IN ({ph}) AND is_main=0",
                      [json.dumps(d['permissions'], ensure_ascii=False)] + ids)
+    if 'is_active' in d:
+        conn.execute(f"UPDATE admins SET is_active=? WHERE id IN ({ph}) AND is_main=0",
+                     [1 if d['is_active'] else 0] + ids)
     if d.get('reset_password'):
-        new_pwd = sha(d['reset_password'])
-        conn.execute(f"UPDATE admins SET password=? WHERE id IN ({','.join('?'*len(ids))}) AND is_main=0",
-                     [new_pwd] + ids)
+        conn.execute(f"UPDATE admins SET password=? WHERE id IN ({ph}) AND is_main=0",
+                     [sha(d['reset_password'])] + ids)
     conn.commit(); conn.close()
     return jsonify({'success': True})
 
@@ -1165,11 +1082,7 @@ def list_admins():
     a = get_me()
     if not a['is_main']: return jsonify({'error': '无权限'}), 403
     conn = db()
-    rows = conn.execute("""
-        SELECT a.id,a.name,a.phone,a.is_main,a.role_id,a.permissions,a.created_at,
-               r.name role_name
-        FROM admins a LEFT JOIN roles r ON a.role_id=r.id
-        ORDER BY a.id""").fetchall()
+    rows = conn.execute("SELECT id,name,phone,is_main,role_name,is_active,permissions,created_at FROM admins ORDER BY id").fetchall()
     conn.close()
     return jsonify([dict(r) for r in rows])
 
@@ -1181,9 +1094,10 @@ def create_admin():
     d = request.json or {}
     conn = db()
     try:
-        conn.execute("INSERT INTO admins(name,phone,password,role_id,permissions) VALUES(?,?,?,?,?)",
+        conn.execute("INSERT INTO admins(name,phone,password,role_name,is_active,permissions) VALUES(?,?,?,?,?,?)",
                      (d['name'], d['phone'], sha(d['password']),
-                      d.get('role_id') or None,
+                      d.get('role_name',''),
+                      1 if d.get('is_active',1) else 0,
                       json.dumps(d.get('permissions', {}), ensure_ascii=False)))
         conn.commit()
     except Exception:
@@ -1198,8 +1112,9 @@ def update_admin(aid):
     if not a['is_main'] and a['id'] != aid: return jsonify({'error': '无权限'}), 403
     conn = db()
     if a['is_main']:
-        conn.execute("UPDATE admins SET name=?,role_id=?,permissions=? WHERE id=?",
-                     (d.get('name',''), d.get('role_id') or None,
+        conn.execute("UPDATE admins SET name=?,role_name=?,is_active=?,permissions=? WHERE id=?",
+                     (d.get('name',''), d.get('role_name',''),
+                      1 if d.get('is_active',1) else 0,
                       json.dumps(d.get('permissions',{}), ensure_ascii=False), aid))
     if d.get('password'):
         conn.execute("UPDATE admins SET password=? WHERE id=?", (sha(d['password']), aid))
