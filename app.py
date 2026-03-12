@@ -153,19 +153,32 @@ def can(admin, perm):
     p = json.loads(admin['permissions'] or '{}')
     return p.get('all') or p.get(perm, False)
 
-def admin_owns_comp(admin, comp_id):
-    if admin['is_main']: return True
+def comp_perm(admin, comp_id):
+    """返回该管理员对指定赛事的权限级别：'edit' / 'view' / None"""
+    if not admin: return None
+    if admin['is_main']: return 'edit'
     conn = db()
     comp = conn.execute("SELECT created_by, comp_admins FROM competitions WHERE id=?", (comp_id,)).fetchone()
     conn.close()
-    if not comp: return False
-    if comp['created_by'] == admin['id']: return True
+    if not comp: return None
+    if comp['created_by'] == admin['id']: return 'edit'
     try:
         for ca in json.loads(comp['comp_admins'] or '[]'):
-            if ca.get('admin_id') == admin['id']: return True
+            if ca.get('admin_id') == admin['id']:
+                return ca.get('perm', 'view')  # 'edit' or 'view'
     except Exception:
         pass
-    return False
+    return None
+
+def admin_owns_comp(admin, comp_id):
+    """兼容旧调用：有任意权限即返回 True"""
+    return comp_perm(admin, comp_id) is not None
+
+def can_view_comp(admin, comp_id):
+    return comp_perm(admin, comp_id) in ('view', 'edit')
+
+def can_edit_comp(admin, comp_id):
+    return comp_perm(admin, comp_id) == 'edit' 
 
 # ═══════════════════════════════════════════════════════════════════
 # PUBLIC PLAYER ROUTES
@@ -312,11 +325,22 @@ def list_competitions():
             adm.name creator_name FROM competitions c
             LEFT JOIN admins adm ON c.created_by=adm.id ORDER BY c.id DESC""").fetchall()
     else:
-        rows = conn.execute("""
+        # 包含自己创建的 + 被分配权限的赛事
+        all_comps = conn.execute("""
             SELECT c.*,(SELECT COUNT(*) FROM players WHERE competition_id=c.id) pc,
             adm.name creator_name FROM competitions c
-            LEFT JOIN admins adm ON c.created_by=adm.id
-            WHERE c.created_by=? ORDER BY c.id DESC""", (a['id'],)).fetchall()
+            LEFT JOIN admins adm ON c.created_by=adm.id ORDER BY c.id DESC""").fetchall()
+        rows = []
+        for c in all_comps:
+            if c['created_by'] == a['id']:
+                rows.append(c)
+            else:
+                try:
+                    for ca in json.loads(c['comp_admins'] or '[]'):
+                        if ca.get('admin_id') == a['id']:
+                            rows.append(c); break
+                except Exception:
+                    pass
     conn.close()
     return jsonify([dict(r) for r in rows])
 
@@ -475,7 +499,7 @@ def list_players():
     cid = request.args.get('competition_id')
     if not cid: return jsonify([])
     a = get_me()
-    if not admin_owns_comp(a, int(cid)): return jsonify({'error': '无权限'}), 403
+    if not can_view_comp(a, int(cid)): return jsonify({'error': '无权限'}), 403
     q = "SELECT * FROM players WHERE competition_id=?"
     params = [cid]
     for f, col in [('group', 'group_name'), ('date', 'comp_date'),
@@ -500,6 +524,8 @@ def list_players():
 def create_player():
     d = request.json or {}
     if not d.get('name'): return jsonify({'error': '姓名必填'}), 400
+    a = get_me()
+    if not can_edit_comp(a, int(d.get('competition_id', 0))): return jsonify({'error': '无权限，需要编辑权限'}), 403
     conn = db()
     conn.execute("""INSERT INTO players(competition_id,player_no,account,name,school,grade,
                     group_name,comp_date,session,seat_no,shirt_size,remark) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)""",
@@ -514,7 +540,11 @@ def create_player():
 @admin_required
 def update_player(pid):
     d = request.json or {}
+    a = get_me()
     conn = db()
+    p = conn.execute("SELECT competition_id FROM players WHERE id=?", (pid,)).fetchone()
+    if not p or not can_edit_comp(a, p['competition_id']):
+        conn.close(); return jsonify({'error': '无权限，需要编辑权限'}), 403
     conn.execute("""UPDATE players SET player_no=?,account=?,name=?,school=?,grade=?,
                     group_name=?,comp_date=?,session=?,seat_no=?,shirt_size=?,
                     checked_in=?,checkin_time=?,remark=? WHERE id=?""",
@@ -529,7 +559,11 @@ def update_player(pid):
 @app.route('/api/players/<int:pid>', methods=['DELETE'])
 @admin_required
 def delete_player(pid):
+    a = get_me()
     conn = db()
+    p = conn.execute("SELECT competition_id FROM players WHERE id=?", (pid,)).fetchone()
+    if not p or not can_edit_comp(a, p['competition_id']):
+        conn.close(); return jsonify({'error': '无权限，需要编辑权限'}), 403
     conn.execute("DELETE FROM players WHERE id=?", (pid,))
     conn.commit(); conn.close()
     return jsonify({'success': True})
@@ -540,6 +574,7 @@ def import_players():
     a = get_me()
     if not can(a, 'import_players'): return jsonify({'error': '无权限'}), 403
     cid = request.form.get('competition_id')
+    if cid and not can_edit_comp(a, int(cid)): return jsonify({'error': '无权限，需要编辑权限'}), 403
     upload = request.files.get('file')
     if not cid or not upload: return jsonify({'error': '参数缺失'}), 400
 
@@ -638,8 +673,8 @@ def batch_delete_players():
     # 鉴权：所有id都属于该管理员有权限的赛事
     for pid in ids:
         p = conn.execute("SELECT competition_id FROM players WHERE id=?", (pid,)).fetchone()
-        if p and not admin_owns_comp(a, p['competition_id']):
-            conn.close(); return jsonify({'error': '无权限'}), 403
+        if p and not can_edit_comp(a, p['competition_id']):
+            conn.close(); return jsonify({'error': '无权限，需要编辑权限'}), 403
     placeholders = ','.join('?' * len(ids))
     conn.execute(f"DELETE FROM players WHERE id IN ({placeholders})", ids)
     conn.commit(); conn.close()
@@ -662,8 +697,8 @@ def batch_update_players():
     conn = db()
     for pid in ids:
         p = conn.execute("SELECT competition_id FROM players WHERE id=?", (pid,)).fetchone()
-        if p and not admin_owns_comp(a, p['competition_id']):
-            conn.close(); return jsonify({'error': '无权限'}), 403
+        if p and not can_edit_comp(a, p['competition_id']):
+            conn.close(); return jsonify({'error': '无权限，需要编辑权限'}), 403
     set_clause = ', '.join(f"{k}=?" for k in safe)
     vals = list(safe.values())
     placeholders = ','.join('?' * len(ids))
@@ -695,6 +730,8 @@ def batch_delete_competitions():
 @app.route('/api/players/export/<int:cid>')
 @admin_required
 def export_players(cid):
+    a = get_me()
+    if not can_view_comp(a, cid): return jsonify({'error': '无权限'}), 403
     conn = db()
     # 支持筛选参数导出（功能3）
     q = "SELECT * FROM players WHERE competition_id=?"
@@ -779,17 +816,19 @@ def competition_locations():
     conn = db()
     if a['is_main']:
         rows = conn.execute("SELECT DISTINCT location FROM competitions WHERE location!='' ORDER BY location").fetchall()
+        conn.close()
+        return jsonify([r['location'] for r in rows])
     else:
-        rows = conn.execute("SELECT DISTINCT location FROM competitions WHERE location!='' AND created_by=? ORDER BY location",
-                            (a['id'],)).fetchall()
-    conn.close()
-    return jsonify([r['location'] for r in rows])
+        all_comps = conn.execute("SELECT id,location,comp_admins,created_by FROM competitions WHERE location!=''").fetchall()
+        conn.close()
+        locs = sorted(set(c['location'] for c in all_comps if can_view_comp(a, c['id'])))
+        return jsonify(locs)
 
 @app.route('/api/stats/<int:cid>')
 @admin_required
 def stats(cid):
     a = get_me()
-    if not admin_owns_comp(a, cid): return jsonify({'error': '无权限'}), 403
+    if not can_view_comp(a, cid): return jsonify({'error': '无权限'}), 403
     # 功能4：支持按地点筛选（location 筛选的是赛事列表层，这里支持跨赛事按地点汇总）
     location = request.args.get('location', '').strip()
     conn = db()
@@ -799,8 +838,9 @@ def stats(cid):
         if a['is_main']:
             cid_rows = conn.execute("SELECT id FROM competitions WHERE location=?", (location,)).fetchall()
         else:
-            cid_rows = conn.execute("SELECT id FROM competitions WHERE location=? AND created_by=?",
-                                    (location, a['id'])).fetchall()
+            all_loc = conn.execute("SELECT id,comp_admins,created_by FROM competitions WHERE location=?",
+                                   (location,)).fetchall()
+            cid_rows = [r for r in all_loc if can_view_comp(a, r['id'])]
         cids = [r['id'] for r in cid_rows]
         if not cids:
             conn.close()
@@ -844,7 +884,7 @@ def stats(cid):
 @admin_required
 def export_stats(cid):
     a = get_me()
-    if not admin_owns_comp(a, cid): return jsonify({'error': '无权限'}), 403
+    if not can_view_comp(a, cid): return jsonify({'error': '无权限'}), 403
     conn = db()
     comp = conn.execute("SELECT name FROM competitions WHERE id=?", (cid,)).fetchone()
     total = conn.execute("SELECT COUNT(*) FROM players WHERE competition_id=?", (cid,)).fetchone()[0]
@@ -945,8 +985,8 @@ if __name__ == '__main__':
     init_db()
     print("\n" + "="*55)
     print("  🚀 ICode 签到管理系统 v3.2  — 批量操作版")
-    print("  选手签到: http://localhost:5001/")
-    print("  管理后台: http://localhost:5001/admin")
+    print("  选手签到: http://localhost:5000/")
+    print("  管理后台: http://localhost:5000/admin")
     print("  账号: admin  密码: admin123")
     print("="*55 + "\n")
-    app.run(debug=True, host='0.0.0.0', port=5001)
+    app.run(debug=True, host='0.0.0.0', port=5000)
