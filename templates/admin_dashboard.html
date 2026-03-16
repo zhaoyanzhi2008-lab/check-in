@@ -860,13 +860,22 @@ tbody tr:last-child td{border-bottom:none}
           <label>自定义字段（管理员可添加额外字段）</label>
           <div class="chips" id="cCustomFieldsChips" style="margin-top:4px"></div>
           <div style="display:flex;gap:6px;margin-top:8px">
-            <input type="text" id="newCustomField" placeholder="新字段名（英文）" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px">
+            <input type="text" id="newCustomField" placeholder="新字段名（支持中文）" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px">
             <button class="btn btn-cyan btn-xs" type="button" onclick="addCustomField()">添加</button>
           </div>
-          <span class="hint">自定义字段将在导入模板、选手列表和导出中自动出现。字段名请使用英文。</span>
+          <span class="hint">字段名支持中文，添加后可在下方选择是否在签到页显示</span>
         </div>
       </div>
-
+      <!-- ========== 在这里添加自定义字段显示控制 ========== -->
+      <!-- 自定义字段显示控制 -->
+      <div class="fg" id="customFieldDisplayContainer" style="display:none">
+        <div class="ff">
+          <label>签到页显示的自定义字段</label>
+          <div class="chips" id="cCustomFieldDisplayChips"></div>
+          <span class="hint">点击选择要在选手签到页面显示的字段</span>
+        </div>
+      </div>
+      <!-- ============================================== -->
       <div class="fg c2">
         <div class="ff">
           <label>查询字段</label>
@@ -1066,6 +1075,8 @@ let editComp=null, editPlayer=null, editAdmin=null
 let selDispFields=[], adminPerms={}
 let customFields = []  // 赛事自定义字段
 let playerCustomData = {}  // 选手自定义数据
+let customFields = []  // 所有自定义字段
+let customFieldsDisplay = []  // 要在签到页显示的自定义字段  ← 在这里添加
 
 // ==================== 初始化 ====================
 async function init(){
@@ -1253,20 +1264,61 @@ function onCAChk(aid,cb){
 function renderCustomFieldsChips(fields){
   const box = document.getElementById('cCustomFieldsChips')
   if(!box) return
+  
+  if(!fields || !fields.length){
+    box.innerHTML = ''
+    document.getElementById('customFieldDisplayContainer').style.display = 'none'
+    return
+  }
+  
+  document.getElementById('customFieldDisplayContainer').style.display = 'block'
+  
   box.innerHTML = fields.map(f => `
-    <div class="chip on" style="position:relative;padding-right:24px" onclick="removeCustomField('${f}')">
-      ${f}
+    <div class="chip on" style="position:relative;padding-right:24px;margin-bottom:4px" 
+         onclick="removeCustomField('${f.replace(/'/g, "\\'")}')">
+      ${esc(f)}
       <span style="position:absolute;right:6px;top:3px;font-size:12px;color:var(--dim)">×</span>
+    </div>
+  `).join('')
+  
+  // 渲染显示控制
+  renderCustomFieldDisplayChips(fields)
+}
+// 渲染自定义字段显示控制
+function renderCustomFieldDisplayChips(fields){
+  const container = document.getElementById('cCustomFieldDisplayChips')
+  if(!container) return
+  
+  container.innerHTML = fields.map(f => `
+    <div class="chip${customFieldsDisplay.includes(f) ? ' on' : ''}" 
+         onclick="toggleCustomFieldDisplay('${f.replace(/'/g, "\\'")}', this)">
+      ${esc(f)}
     </div>
   `).join('')
 }
 
+// 切换自定义字段显示状态
+function toggleCustomFieldDisplay(field, el){
+  if(customFieldsDisplay.includes(field)){
+    customFieldsDisplay = customFieldsDisplay.filter(f => f !== field)
+    el.classList.remove('on')
+  } else {
+    customFieldsDisplay.push(field)
+    el.classList.add('on')
+  }
+}
+// 添加自定义字段
 function addCustomField(){
   const inp = document.getElementById('newCustomField')
   const val = inp.value.trim()
   if(!val){toast('请输入字段名','err');return}
+  // 允许中文、字母、数字、下划线
   if(!/^[\u4e00-\u9fa5a-zA-Z0-9_]+$/.test(val)){
     toast('字段名只能包含中文、字母、数字和下划线','err')
+    return
+  }
+    if(val.length > 20){
+    toast('字段名不能超过20个字符','err')
     return
   }
   if(customFields.includes(val)){
@@ -1274,12 +1326,17 @@ function addCustomField(){
     return
   }
   customFields.push(val)
+  // 默认添加到显示列表
+  customFieldsDisplay.push(val)
+
   renderCustomFieldsChips(customFields)
   inp.value = ''
 }
 
+// 删除自定义字段
 function removeCustomField(field){
   customFields = customFields.filter(f => f !== field)
+  customFieldsDisplay = customFieldsDisplay.filter(f => f !== field)
   renderCustomFieldsChips(customFields)
 }
 
@@ -1309,9 +1366,12 @@ async function doCompImport(){
 
 // ==================== 赛事编辑 ====================
 function openCompModal(){
-  editComp=null; selDispFields=['name','school','group_name','session','seat_no','shirt_size','package']
+  editComp=null; 
+  selDispFields=['name','school','group_name','session','seat_no','shirt_size','kit']
   compAdminPerms={}
   customFields = []
+  customFieldsDisplay = []
+  
   document.getElementById('mCompT').textContent='新增赛项'
   ;['cName','cLoc','cDesc','cGroups','cAlbum','cManager'].forEach(i=>document.getElementById(i).value='')
   descImgData=[]; renderDescImgPreview()
@@ -1330,8 +1390,21 @@ function openCompModal(){
 
 async function editCompFn(id){
   const c=COMPS.find(x=>x.id===id); if(!c)return
-  editComp=c; selDispFields=JSON.parse(c.display_fields||'[]')
-  customFields = JSON.parse(c.custom_fields || '[]')
+  editComp=c; 
+  selDispFields=JSON.parse(c.display_fields||'[]')
+  
+  // 解析自定义字段
+  const customData = JSON.parse(c.custom_fields || '[]')
+  if(Array.isArray(customData)){
+    customFields = customData
+    // 从display_fields中提取要显示的自定义字段
+    customFieldsDisplay = selDispFields.filter(f => f.startsWith('custom_'))
+                                       .map(f => f.replace('custom_', ''))
+  } else {
+    customFields = []
+    customFieldsDisplay = []
+  }
+  
   document.getElementById('mCompT').textContent='编辑赛项'
   document.getElementById('cName').value=c.name
   document.getElementById('cLoc').value=c.location||''
@@ -1350,6 +1423,7 @@ async function editCompFn(id){
   document.getElementById('cQueryField').value=c.query_field||'player_no,account'
   document.getElementById('cQueryHint').value=c.query_hint||''
   document.getElementById('cActive').value=c.is_active??1
+  
   renderCompChips()
   renderCustomFieldsChips(customFields)
   renderCompAdminList(JSON.parse(c.comp_admins||'[]'))
@@ -1377,6 +1451,13 @@ async function saveComp(){
   const name=document.getElementById('cName').value.trim()
   if(!name){toast('请填写赛事名称','err');return}
   const imgs=descImgData.slice(0,5)
+  
+  // 合并内置显示字段和自定义显示字段
+  const finalDisplayFields = [
+    ...selDispFields,
+    ...customFieldsDisplay.map(f => `custom_${f}`)
+  ]
+  
   const data={
     name,location:document.getElementById('cLoc').value,
     start_time:document.getElementById('cStart').value,
@@ -1390,12 +1471,13 @@ async function saveComp(){
     banner_color:document.getElementById('cBgColor').value,
     banner_accent:document.getElementById('cAccColor').value,
     groups:document.getElementById('cGroups').value.split(',').map(g=>g.trim()).filter(Boolean),
-    display_fields:selDispFields,
+    display_fields:finalDisplayFields,
     custom_fields:customFields,
     query_field:document.getElementById('cQueryField').value||'player_no,account',
     query_hint:document.getElementById('cQueryHint').value,
     is_active:parseInt(document.getElementById('cActive').value)
   }
+  
   const url=editComp?`/api/competitions/${editComp.id}`:'/api/competitions'
   const r=await fetch(url,{method:editComp?'PUT':'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
@@ -1524,7 +1606,7 @@ async function loadPlayers(){
     date:document.getElementById('fDate').value,
     session:document.getElementById('fSession').value,
     shirt:document.getElementById('fShirt').value,
-    package:document.getElementById('fpackage').value,  // 新增package筛选
+    kit:document.getElementById('fKit').value,
     checked:document.getElementById('fChecked').value
   })
   
@@ -1532,73 +1614,97 @@ async function loadPlayers(){
   if(comp && comp.custom_fields){
     const fields = JSON.parse(comp.custom_fields)
     for(const cf of fields){
-      const val = document.getElementById(`f_custom_${cf}`)?.value
+      const safeId = 'f_custom_' + cf.replace(/[^\w\u4e00-\u9fa5]/g, '_')
+      const val = document.getElementById(safeId)?.value
       if(val) params.append(`custom_${cf}`, val)
     }
   }
   
-  const r=await fetch(`/api/players?${params}`)
-  if(!r.ok){toast('权限不足','err');return}
-  const players=await r.json()
-  
-  if(comp){
-    document.getElementById('playerSub').textContent=`${comp.name} · 共 ${players.length} 人`
-    const grps=JSON.parse(comp.groups||'[]')
-    const gs=document.getElementById('fGroup'),gv=gs.value
-    gs.innerHTML='<option value="">所有组别</option>'+grps.map(g=>`<option>${esc(g)}</option>`).join('')
-    if(gv)gs.value=gv
-    
-    // 填充筛选下拉框
-    const fillSel=(id,vals,label)=>{
-      const s=document.getElementById(id),v=s.value
-      s.innerHTML=`<option value="">${label}</option>`+[...new Set(vals.filter(Boolean))].sort().map(o=>`<option>${esc(o)}</option>`).join('')
-      if(v)s.value=v
-    }
-    fillSel('fSchool',players.map(p=>p.school),'所有学校')
-    fillSel('fGrade', players.map(p=>p.grade), '所有年级')
-    fillSel('fDate',  players.map(p=>p.comp_date),'所有日期')
-    fillSel('fSession',players.map(p=>p.session),'所有场次')
-    fillSel('fpackage', players.map(p=>p.package),'所有赛事包')
-    
-    // 填充自定义字段筛选值
-    if(comp.custom_fields){
-      loadCustomFilterValues(players, JSON.parse(comp.custom_fields))
-    }
-  }
-  
-  const cols=['player_no','account','name','school','grade','group_name','comp_date','session','seat_no','shirt_size','package','checked_in','checkin_time','remark']
-  document.getElementById('playerHead').innerHTML=`<tr>
-    <th style="width:36px"><input type="checkbox" id="pSelAll" onchange="toggleSelAllPlayers(this)"></th>
-    ${cols.map(c=>`<th>${FL[c]||c}</th>`).join('')}<th>操作</th></tr>`
-  
-  if(!players.length){
-    document.getElementById('playerTbody').innerHTML=`<tr><td colspan="${cols.length+2}"><div class="empty"><div class="empty-ico">👥</div><div class="empty-txt">暂无选手数据</div></div></td></tr>`
-    return
-  }
-  
-  document.getElementById('playerTbody').innerHTML=players.map(p=>{
-    const cells=cols.map(c=>{
-      if(c==='checked_in')return`<td><span class="tag ${p.checked_in?'t-green':'t-amber'}">${p.checked_in?'✓ 已签到':'⏳ 待签到'}</span></td>`
-      if(c==='shirt_size'&&p[c]){
-        const cl=SHIRT_CLR[p[c]]||'#7a9bb5'
-        return`<td><span style="background:${cl}15;color:${cl};padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;border:1px solid ${cl}25">${p[c]}</span></td>`
+  fetch(`/api/players?${params}`)
+    .then(r => r.json())
+    .then(players => {
+      if(comp){
+        document.getElementById('playerSub').textContent=`${comp.name} · 共 ${players.length} 人`
+        const grps=JSON.parse(comp.groups||'[]')
+        const gs=document.getElementById('fGroup'),gv=gs.value
+        gs.innerHTML='<option value="">所有组别</option>'+grps.map(g=>`<option>${esc(g)}</option>`).join('')
+        if(gv)gs.value=gv
+        
+        // 解析自定义字段列表
+        const customFieldsList = JSON.parse(comp.custom_fields || '[]')
+        
+        // 填充筛选下拉框
+        const fillSel=(id,vals,label)=>{
+          const s=document.getElementById(id),v=s.value
+          s.innerHTML=`<option value="">${label}</option>`+[...new Set(vals.filter(Boolean))].sort().map(o=>`<option>${esc(o)}</option>`).join('')
+          if(v)s.value=v
+        }
+        fillSel('fSchool',players.map(p=>p.school),'所有学校')
+        fillSel('fGrade', players.map(p=>p.grade), '所有年级')
+        fillSel('fDate',  players.map(p=>p.comp_date),'所有日期')
+        fillSel('fSession',players.map(p=>p.session),'所有场次')
+        fillSel('fKit', players.map(p=>p.kit),'所有赛事包')
+        
+        // 填充自定义字段筛选值
+        if(customFieldsList.length){
+          loadCustomFilterValues(players, customFieldsList)
+        }
+        
+        // 构建表头
+        const baseCols = ['player_no','account','name','school','grade','group_name',
+                          'comp_date','session','seat_no','shirt_size','kit','checked_in','checkin_time','remark']
+        const allCols = [...baseCols, ...customFieldsList.map(f => `custom_${f}`)]
+        
+        document.getElementById('playerHead').innerHTML=`<tr>
+          <th style="width:36px"><input type="checkbox" id="pSelAll" onchange="toggleSelAllPlayers(this)"></th>
+          ${allCols.map(c => {
+            if(c.startsWith('custom_')){
+              const fieldName = c.replace('custom_', '')
+              return `<th>${esc(fieldName)}</th>`
+            }
+            return `<th>${FL[c]||c}</th>`
+          }).join('')}<th>操作</th></tr>`
+        
+        if(!players.length){
+          document.getElementById('playerTbody').innerHTML=`<tr><td colspan="${allCols.length+2}"><div class="empty"><div class="empty-ico">👥</div><div class="empty-txt">暂无选手数据</div></div></td></tr>`
+          return
+        }
+        
+        document.getElementById('playerTbody').innerHTML=players.map(p=>{
+          const cells = allCols.map(c => {
+            if(c === 'checked_in'){
+              return`<td><span class="tag ${p.checked_in?'t-green':'t-amber'}">${p.checked_in?'✓ 已签到':'⏳ 待签到'}</span></td>`
+            }
+            if(c === 'shirt_size' && p[c]){
+              const cl=SHIRT_CLR[p[c]]||'#7a9bb5'
+              return`<td><span style="background:${cl}15;color:${cl};padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;border:1px solid ${cl}25">${p[c]}</span></td>`
+            }
+            if(c === 'kit' && p[c]){
+              const cl=KIT_CLR[p[c]]||'#7a9bb5'
+              return`<td><span style="background:${cl}15;color:${cl};padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;border:1px solid ${cl}25">${p[c]}</span></td>`
+            }
+            if(c.startsWith('custom_')){
+              const fieldName = c.replace('custom_', '')
+              return `<td>${esc(p.custom_data?.[fieldName] || '—')}</td>`
+            }
+            return`<td>${esc(String(p[c]||'—'))}</td>`
+          }).join('')
+          
+          const chked=SEL_IDS.has(p.id)?'checked':''
+          return`<tr>
+            <td><input type="checkbox" class="p-chk" value="${p.id}" ${chked} onchange="onPlayerChk(this)"></td>
+            ${cells}<td>
+              <div style="display:flex;gap:5px">
+                <button class="btn btn-cyan btn-xs" onclick='editPlayerFn(${JSON.stringify(p).replace(/'/g,"&#39;")})'>编辑</button>
+                <button class="btn btn-red btn-xs" onclick="delPlayer(${p.id})">删除</button>
+              </div>
+            </td></tr>`
+        }).join('')
       }
-      if(c==='package'&&p[c]){
-        const cl=package_CLR[p[c]]||'#7a9bb5'
-        return`<td><span style="background:${cl}15;color:${cl};padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;border:1px solid ${cl}25">${p[c]}</span></td>`
-      }
-      return`<td>${esc(String(p[c]||'—'))}</td>`
-    }).join('')
-    const chked=SEL_IDS.has(p.id)?'checked':''
-    return`<tr>
-      <td><input type="checkbox" class="p-chk" value="${p.id}" ${chked} onchange="onPlayerChk(this)"></td>
-      ${cells}<td>
-        <div style="display:flex;gap:5px">
-          <button class="btn btn-cyan btn-xs" onclick='editPlayerFn(${JSON.stringify(p).replace(/'/g,"&#39;")})'>编辑</button>
-          <button class="btn btn-red btn-xs" onclick="delPlayer(${p.id})">删除</button>
-        </div>
-      </td></tr>`
-  }).join('')
+    })
+    .catch(err => {
+      toast('权限不足','err')
+    })
 }
 
 function renderCustomFieldsInModal(customFields, customData){

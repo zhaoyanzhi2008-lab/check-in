@@ -272,7 +272,13 @@ def pub_query():
     comp = conn.execute("SELECT display_fields,query_field,custom_fields FROM competitions WHERE id=?",
                         (cid,)).fetchone()
     if not comp: conn.close(); return jsonify({'error': '赛事不存在'}), 404
+
     display_fields = json.loads(comp['display_fields'])
+    custom_fields = json.loads(comp['custom_fields'] or '[]')
+
+    # 合并自定义字段到display_fields
+    all_display_fields = display_fields + [f'custom_{cf}' for cf in custom_fields]
+
     query_fields = [f.strip() for f in (comp['query_field'] or 'player_no,account').split(',')]
     tokens = [t for t in q.split() if t]
     results = []
@@ -290,7 +296,7 @@ def pub_query():
             seen.add(row['id'])
     conn.close()
     if not results: return jsonify({'error': '未找到选手，请检查编号是否正确'}), 404
-    return jsonify({'players': results, 'display_fields': display_fields})
+    return jsonify({'players': results, 'display_fields': all_display_fields})
 
 
 @app.route('/api/pub/checkin', methods=['POST'])
