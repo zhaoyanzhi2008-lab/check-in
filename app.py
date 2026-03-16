@@ -59,7 +59,7 @@ def init_db():
         banner_color TEXT DEFAULT '#1a6fa8',
         banner_accent TEXT DEFAULT '#0099cc',
         groups TEXT DEFAULT '[]',
-        display_fields TEXT DEFAULT '["name","school","group_name","session","seat_no","shirt_size","kit"]',
+        display_fields TEXT DEFAULT '["name","school","group_name","session","seat_no","shirt_size","package"]',
         custom_fields TEXT DEFAULT '[]',
         query_field TEXT DEFAULT 'player_no,account',
         query_hint TEXT DEFAULT '请输入报名编号或选手账号',
@@ -80,7 +80,7 @@ def init_db():
         session TEXT DEFAULT '',
         seat_no TEXT DEFAULT '',
         shirt_size TEXT DEFAULT '',
-        kit TEXT DEFAULT '',
+        package TEXT DEFAULT '',
         custom_data TEXT DEFAULT '{}',
         checked_in INTEGER DEFAULT 0,
         checkin_time TEXT DEFAULT '',
@@ -108,7 +108,7 @@ def init_db():
         except Exception:
             pass
     try:
-        c.execute("ALTER TABLE players ADD COLUMN kit TEXT DEFAULT ''")
+        c.execute("ALTER TABLE players ADD COLUMN package TEXT DEFAULT ''")
     except Exception:
         pass
     try:
@@ -135,32 +135,32 @@ def init_db():
                    '欢迎参加 ICode 全国青少年编程大赛',
                    '#1a6fa8', '#0099cc',
                    '["初级组","中级组","高级组"]',
-                   '["name","school","group_name","session","seat_no","shirt_size","kit"]',
+                   '["name","school","group_name","session","seat_no","shirt_size","package"]',
                    'player_no,account', '请输入报名编号或选手账号'))
         cid = c.lastrowid
         demo = [
             ('IC2025001', 'user001', '张小明', '北京海淀实验小学', '六年级', '初级组', '2025-06-15', '上午场', 'A-01',
-             'M', '标准包', 0),
+             'M', '套装1', 0),
             ('IC2025002', 'user002', '李思远', '清华大学附属小学', '五年级', '初级组', '2025-06-15', '上午场', 'A-02',
-             'S', '标准包', 0),
+             'S', '套装1', 0),
             (
             'IC2025003', 'user003', '王浩然', '北京第二实验小学', '初一', '中级组', '2025-06-15', '下午场', 'B-01', 'L',
-            '不含赛事包', 1),
+            '无', 1),
             (
             'IC2025004', 'user004', '赵雨欣', '人民大学附属中学', '初二', '中级组', '2025-06-15', '下午场', 'B-02', 'M',
-            '标准包', 0),
+            '套装1', 0),
             ('IC2025005', 'user005', '孙悦琪', '北京师范大学附属中学', '高一', '高级组', '2025-06-16', '上午场', 'C-01',
-             'XL', '高级包', 0),
+             'XL', '套装2', 0),
             ('IC2025006', 'user006', '陈思涵', '育才学校', '高二', '高级组', '2025-06-16', '上午场', 'C-02', 'S',
-             '标准包', 0),
+             '套装1', 0),
             ('IC2025007', 'user007', '林志远', '北大附中', '高二', '高级组', '2025-06-16', '下午场', 'C-03', 'M',
-             '不含赛事包', 0),
+             '无', 0),
         ]
         nw = now_str()
         for d in demo:
             ct = nw if d[11] else ''
             c.execute("""INSERT INTO players(competition_id,player_no,account,name,school,grade,
-                         group_name,comp_date,session,seat_no,shirt_size,kit,checked_in,checkin_time)
+                         group_name,comp_date,session,seat_no,shirt_size,package,checked_in,checkin_time)
                          VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                       (cid, *d[:11], d[11], ct))
     conn.commit();
@@ -437,7 +437,7 @@ def create_competition():
                   d.get('banner_color', '#1a6fa8'), d.get('banner_accent', '#0099cc'),
                   json.dumps(d.get('groups', []), ensure_ascii=False),
                   json.dumps(d.get('display_fields',
-                                   ['name', 'school', 'group_name', 'session', 'seat_no', 'shirt_size', 'kit']),
+                                   ['name', 'school', 'group_name', 'session', 'seat_no', 'shirt_size', 'package']),
                              ensure_ascii=False),
                   json.dumps(d.get('custom_fields', []), ensure_ascii=False),
                   d.get('query_field', 'player_no,account'),
@@ -557,7 +557,7 @@ def import_competitions():
                       json.dumps(comp_admins, ensure_ascii=False),
                       d.get('banner_text', '欢迎参加ICode比赛'), '#1a6fa8', '#0099cc',
                       json.dumps(grps, ensure_ascii=False),
-                      '["name","school","group_name","session","seat_no","shirt_size","kit"]',
+                      '["name","school","group_name","session","seat_no","shirt_size","package"]',
                       json.dumps(custom_fields, ensure_ascii=False),
                       d.get('query_field', 'player_no,account'),
                       d.get('query_hint', '请输入报名编号或选手账号'),
@@ -633,7 +633,7 @@ def list_players():
     params = [cid]
     for f, col in [('group', 'group_name'), ('date', 'comp_date'),
                    ('session', 'session'), ('shirt', 'shirt_size'),
-                   ('school', 'school'), ('grade', 'grade'), ('kit', 'kit')]:
+                   ('school', 'school'), ('grade', 'grade'), ('package', 'package')]:
         v = request.args.get(f, '')
         if v: q += f" AND {col}=?"; params.append(v)
 
@@ -673,11 +673,11 @@ def create_player():
     if not can_edit_comp(a, int(d.get('competition_id', 0))): return jsonify({'error': '无权限，需要编辑权限'}), 403
     conn = db()
     conn.execute("""INSERT INTO players(competition_id,player_no,account,name,school,grade,
-                    group_name,comp_date,session,seat_no,shirt_size,kit,custom_data,remark) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    group_name,comp_date,session,seat_no,shirt_size,package,custom_data,remark) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                  (d['competition_id'], d.get('player_no', ''), d.get('account', ''), d['name'],
                   d.get('school', ''), d.get('grade', ''), d.get('group_name', ''),
                   d.get('comp_date', ''), d.get('session', ''), d.get('seat_no', ''),
-                  d.get('shirt_size', ''), d.get('kit', ''),
+                  d.get('shirt_size', ''), d.get('package', ''),
                   json.dumps(d.get('custom_data', {}), ensure_ascii=False),
                   d.get('remark', '')))
     conn.commit();
@@ -696,12 +696,12 @@ def update_player(pid):
         conn.close();
         return jsonify({'error': '无权限，需要编辑权限'}), 403
     conn.execute("""UPDATE players SET player_no=?,account=?,name=?,school=?,grade=?,
-                    group_name=?,comp_date=?,session=?,seat_no=?,shirt_size=?,kit=?,
+                    group_name=?,comp_date=?,session=?,seat_no=?,shirt_size=?,package=?,
                     custom_data=?,checked_in=?,checkin_time=?,remark=? WHERE id=?""",
                  (d.get('player_no', ''), d.get('account', ''), d.get('name', ''),
                   d.get('school', ''), d.get('grade', ''), d.get('group_name', ''),
                   d.get('comp_date', ''), d.get('session', ''), d.get('seat_no', ''),
-                  d.get('shirt_size', ''), d.get('kit', ''),
+                  d.get('shirt_size', ''), d.get('package', ''),
                   json.dumps(d.get('custom_data', {}), ensure_ascii=False),
                   d.get('checked_in', 0), d.get('checkin_time', ''), d.get('remark', ''), pid))
     conn.commit();
@@ -752,7 +752,7 @@ def import_players():
     hdrs = [str(c.value).strip().rstrip('*').strip() if c.value else '' for c in ws[1]]
     fm = {'报名编号': 'player_no', '账号': 'account', '姓名': 'name', '学校': 'school',
           '年级': 'grade', '组别': 'group_name', '比赛日期': 'comp_date', '场次': 'session',
-          '座位号': 'seat_no', '衣服尺码': 'shirt_size', '赛事包': 'kit', '备注': 'remark'}
+          '座位号': 'seat_no', '衣服尺码': 'shirt_size', '赛事包': 'package', '备注': 'remark'}
 
     # 添加自定义字段映射
     for cf in custom_fields:
@@ -817,12 +817,12 @@ def import_players():
     for pdata in to_insert:
         custom_data = json.dumps(pdata.get('custom_data', {}), ensure_ascii=False)
         conn.execute("""INSERT INTO players(competition_id,player_no,account,name,school,grade,
-                        group_name,comp_date,session,seat_no,shirt_size,kit,custom_data,remark) 
+                        group_name,comp_date,session,seat_no,shirt_size,package,custom_data,remark) 
                         VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                      (cid, pdata.get('player_no', ''), pdata.get('account', ''), pdata.get('name', ''),
                       pdata.get('school', ''), pdata.get('grade', ''), pdata.get('group_name', ''),
                       pdata.get('comp_date', ''), pdata.get('session', ''), pdata.get('seat_no', ''),
-                      pdata.get('shirt_size', ''), pdata.get('kit', ''), custom_data,
+                      pdata.get('shirt_size', ''), pdata.get('package', ''), custom_data,
                       pdata.get('remark', '')))
         cnt += 1
     conn.commit();
@@ -864,7 +864,7 @@ def batch_update_players():
     if not fields and not custom_fields: return jsonify({'error': '未指定修改字段'}), 400
 
     allowed = {'player_no', 'account', 'name', 'school', 'grade', 'group_name',
-               'comp_date', 'session', 'seat_no', 'shirt_size', 'kit', 'remark', 'checked_in', 'checkin_time'}
+               'comp_date', 'session', 'seat_no', 'shirt_size', 'package', 'remark', 'checked_in', 'checkin_time'}
     safe = {k: v for k, v in fields.items() if k in allowed}
 
     a = get_me()
@@ -935,7 +935,7 @@ def export_players(cid):
     params = [cid]
     for f, col in [('group', 'group_name'), ('date', 'comp_date'),
                    ('session', 'session'), ('shirt', 'shirt_size'),
-                   ('school', 'school'), ('grade', 'grade'), ('kit', 'kit')]:
+                   ('school', 'school'), ('grade', 'grade'), ('package', 'package')]:
         v = request.args.get(f, '')
         if v: q += f" AND {col}=?"; params.append(v)
 
@@ -988,7 +988,7 @@ def export_players(cid):
     for ri, p in enumerate(players_with_custom):
         row = [p['id'], p['player_no'], p['account'], p['name'], p['school'],
                p['grade'], p['group_name'], p['comp_date'], p['session'],
-               p['seat_no'], p['shirt_size'], p['kit']]
+               p['seat_no'], p['shirt_size'], p['package']]
         # 添加自定义字段值
         for cf in custom_fields:
             row.append(p['custom_data'].get(cf, ''))
@@ -1050,7 +1050,7 @@ def player_template():
 
     # 示例数据
     example = ['IC001', 'user001', '张三', '北京实验小学', '六年级', '初级组', '2025-06-15', '上午场', 'A-001', 'M',
-               '标准包']
+               '套装1']
     for cf in custom_fields:
         example.append(f'示例{cf}')
     example.append('')
@@ -1107,7 +1107,7 @@ def stats(cid):
         if not cids:
             conn.close()
             return jsonify({'total': 0, 'checked': 0, 'unchecked': 0, 'by_session': [], 'by_group': [],
-                            'by_shirt': [], 'by_kit': [], 'by_date': [], 'recent': [], 'location': location,
+                            'by_shirt': [], 'by_package': [], 'by_date': [], 'recent': [], 'location': location,
                             'comp_names': []})
         ph = ','.join('?' * len(cids))
         where = f"competition_id IN ({ph})"
@@ -1127,8 +1127,8 @@ def stats(cid):
         FROM players WHERE {where} GROUP BY group_name ORDER BY total DESC""", p).fetchall()
     by_shirt = conn.execute(f"""SELECT shirt_size,COUNT(*) total FROM players
         WHERE {where} GROUP BY shirt_size ORDER BY total DESC""", p).fetchall()
-    by_kit = conn.execute(f"""SELECT kit,COUNT(*) total FROM players
-        WHERE {where} GROUP BY kit ORDER BY total DESC""", p).fetchall()
+    by_package = conn.execute(f"""SELECT package,COUNT(*) total FROM players
+        WHERE {where} GROUP BY package ORDER BY total DESC""", p).fetchall()
     by_date = conn.execute(f"""SELECT comp_date,COUNT(*) total,SUM(checked_in) checked
         FROM players WHERE {where} GROUP BY comp_date ORDER BY comp_date""", p).fetchall()
     recent = conn.execute(f"""SELECT pl.name,pl.group_name,pl.session,l.checkin_time
@@ -1140,7 +1140,7 @@ def stats(cid):
         'by_session': [dict(r) for r in by_session],
         'by_group': [dict(r) for r in by_group],
         'by_shirt': [dict(r) for r in by_shirt],
-        'by_kit': [dict(r) for r in by_kit],
+        'by_package': [dict(r) for r in by_package],
         'by_date': [dict(r) for r in by_date],
         'recent': [dict(r) for r in recent],
         'location': location,
@@ -1163,8 +1163,8 @@ def export_stats(cid):
         FROM players WHERE competition_id=? GROUP BY group_name""", (cid,)).fetchall()
     by_shirt = conn.execute("""SELECT shirt_size,COUNT(*) total FROM players WHERE competition_id=?
         GROUP BY shirt_size""", (cid,)).fetchall()
-    by_kit = conn.execute("""SELECT kit,COUNT(*) total FROM players WHERE competition_id=?
-        GROUP BY kit""", (cid,)).fetchall()
+    by_package = conn.execute("""SELECT package,COUNT(*) total FROM players WHERE competition_id=?
+        GROUP BY package""", (cid,)).fetchall()
     conn.close()
     wb = openpyxl.Workbook()
     hfill = PatternFill("solid", fgColor="050d1f")
@@ -1195,7 +1195,7 @@ def export_stats(cid):
     add_sheet('衣服尺码', ['尺码', '人数'],
               [[r['shirt_size'], r['total']] for r in by_shirt])
     add_sheet('赛事包', ['赛事包', '人数'],
-              [[r['kit'], r['total']] for r in by_kit])
+              [[r['package'], r['total']] for r in by_package])
     out = io.BytesIO();
     wb.save(out);
     out.seek(0)

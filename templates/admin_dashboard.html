@@ -576,12 +576,10 @@ tbody tr:last-child td{border-bottom:none}
             <option value="">所有尺码</option>
             <option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option>
           </select>
-          <!-- 新增赛事包筛选 -->
           <select id="fpackage" onchange="loadPlayers()">
             <option value="">所有赛事包</option>
             <option>套装1</option><option>套装2</option><option>无</option>
           </select>
-          <!-- 自定义字段筛选容器 -->
           <div id="customFilterContainer" style="display:flex;gap:8px;flex-wrap:wrap"></div>
           <select id="fChecked" onchange="loadPlayers()">
             <option value="">全部状态</option>
@@ -733,7 +731,6 @@ tbody tr:last-child td{border-bottom:none}
           <div class="card-head"><div class="card-title">👕 衣服尺码分布</div></div>
           <div class="card-body"><div id="stShirt" style="display:flex;flex-wrap:wrap;gap:10px"></div></div>
         </div>
-        <!-- 新增赛事包统计 -->
         <div class="card" style="margin:0">
           <div class="card-head"><div class="card-title">🎒 赛事包分布</div></div>
           <div class="card-body"><div id="stpackage" style="display:flex;flex-wrap:wrap;gap:10px"></div></div>
@@ -854,19 +851,19 @@ tbody tr:last-child td{border-bottom:none}
         <div class="ff"><label>组别（逗号分隔）</label><input id="cGroups" placeholder="初级组,中级组,高级组"></div>
       </div>
       
-      <!-- 新增：自定义字段管理 -->
+      <!-- 自定义字段管理区域 -->
       <div class="fg">
         <div class="ff">
           <label>自定义字段（管理员可添加额外字段）</label>
           <div class="chips" id="cCustomFieldsChips" style="margin-top:4px"></div>
-          <div style="display:flex;gap:6px;margin-top:8px">
+          <div style="display:flex;gap:6px;margin-top:8px;margin-bottom:8px">
             <input type="text" id="newCustomField" placeholder="新字段名（支持中文）" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px">
             <button class="btn btn-cyan btn-xs" type="button" onclick="addCustomField()">添加</button>
           </div>
           <span class="hint">字段名支持中文，添加后可在下方选择是否在签到页显示</span>
         </div>
       </div>
-      <!-- ========== 在这里添加自定义字段显示控制 ========== -->
+
       <!-- 自定义字段显示控制 -->
       <div class="fg" id="customFieldDisplayContainer" style="display:none">
         <div class="ff">
@@ -875,7 +872,7 @@ tbody tr:last-child td{border-bottom:none}
           <span class="hint">点击选择要在选手签到页面显示的字段</span>
         </div>
       </div>
-      <!-- ============================================== -->
+
       <div class="fg c2">
         <div class="ff">
           <label>查询字段</label>
@@ -928,7 +925,7 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 </div>
 
-<!-- ══ PLAYER MODAL ══ (新增赛事包字段) -->
+<!-- ══ PLAYER MODAL ══ -->
 <div class="modal-bg" id="mPlayer">
   <div class="modal">
     <div class="modal-head"><div class="modal-title" id="mPlayerT">新增选手</div><button class="modal-close" onclick="closeModal('mPlayer')">×</button></div>
@@ -953,10 +950,9 @@ tbody tr:last-child td{border-bottom:none}
         <div class="ff"><label>场次</label><input id="pSession" placeholder="上午场"></div>
         <div class="ff"><label>座位号</label><input id="pSeat" placeholder="A-001"></div>
       </div>
-      <!-- 新增赛事包字段 -->
       <div class="fg c3">
         <div class="ff"><label>赛事包</label>
-          <select id="ppackage"><option value="">—</option><option>标准包</option><option>高级包</option><option>不含赛事包</option></select>
+          <select id="ppackage"><option value="">—</option><option>套装1</option><option>套装2</option><option>无</option></select>
         </div>
         <div class="ff"><label>签到状态</label>
           <select id="pChkd"><option value="0">未签到</option><option value="1">已签到</option></select>
@@ -1044,17 +1040,150 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 </div>
 
+<!-- ══ 批量修改弹窗 ══ -->
+<div class="modal-bg" id="mBatchUpdate">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-head">
+      <div class="modal-title">✏ 批量修改选手信息</div>
+      <button class="modal-close" onclick="closeModal('mBatchUpdate')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--dim);margin-bottom:14px" id="buHint"></div>
+      <div style="display:grid;gap:10px" id="buGrid"></div>
+      <div style="margin-top:14px;padding:10px 14px;background:#fff8e1;border-radius:8px;
+                  border:1px solid #f9a825;font-size:12px;color:#e65100">
+        ⚠ 仅勾选的字段会被覆盖，未勾选字段保持原值不变
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('mBatchUpdate')">取消</button>
+      <button class="btn btn-solid" onclick="doBatchUpdate()">确认批量修改</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 批量导入赛事 MODAL ══ -->
+<div class="modal-bg" id="mCompImport">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head">
+      <div class="modal-title">📤 批量导入赛事</div>
+      <button class="modal-close" onclick="closeModal('mCompImport')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg"><div class="ff">
+        <label>Excel 文件（.xlsx / .xls）</label>
+        <input type="file" id="compImportFile" accept=".xlsx,.xls"
+          onchange="document.getElementById('compImportErrBox').style.display='none'"
+          style="background:var(--card3);border:1.5px dashed rgba(0,150,220,.3);border-radius:9px;padding:14px;cursor:pointer;color:var(--dim)">
+      </div></div>
+      <div style="background:rgba(0,150,220,.04);border:1px solid var(--border);border-radius:9px;padding:12px;font-size:11px;color:var(--dim);line-height:1.9">
+        📋 请先下载模板，按格式填写后上传<br>
+        必填：<strong style="color:#ff6b6b">赛事名称</strong>；支持：地点、时间、欢迎语、组别、说明、云相册链接、负责人、<strong style="color:#7c3aed">自定义字段</strong>等
+      </div>
+      <div id="compImportErrBox" style="display:none;margin-top:10px;background:#fff1f0;
+           border:1px solid #ffa39e;border-left:4px solid #dc2626;border-radius:8px;
+           padding:10px 14px;font-size:12px;color:#a8071a"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="dlCompTemplate()">📄 下载模板</button>
+      <button class="btn btn-ghost" onclick="closeModal('mCompImport')">取消</button>
+      <button class="btn btn-solid" onclick="doCompImport()">开始导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 批量导入管理员 MODAL ══ -->
+<div class="modal-bg" id="mAdminImport">
+  <div class="modal" style="max-width:480px">
+    <div class="modal-head">
+      <div class="modal-title">📤 批量导入管理员</div>
+      <button class="modal-close" onclick="closeModal('mAdminImport')">×</button>
+    </div>
+    <div class="modal-body">
+      <div class="fg"><div class="ff">
+        <label>Excel 文件（.xlsx / .xls）</label>
+        <input type="file" id="adminImportFile" accept=".xlsx,.xls"
+          onchange="document.getElementById('adminImportErrBox').style.display='none'"
+          style="background:var(--card3);border:1.5px dashed rgba(0,150,220,.3);border-radius:9px;
+                 padding:14px;cursor:pointer;color:var(--dim)">
+      </div></div>
+      <div style="background:rgba(0,150,220,.04);border:1px solid var(--border);border-radius:9px;
+                  padding:12px;font-size:11px;color:var(--dim);line-height:1.9">
+        📋 请先下载模板，填写姓名、手机号、初始密码及权限后上传<br>
+        必填：<strong style="color:#ff6b6b">姓名、手机号、初始密码</strong>（密码至少6位）
+      </div>
+      <div id="adminImportErrBox" style="display:none;margin-top:10px;background:#fff1f0;
+           border:1px solid #ffa39e;border-left:4px solid #dc2626;border-radius:8px;
+           padding:10px 14px;font-size:12px;color:#a8071a"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="dlAdminTemplate()">📄 下载模板</button>
+      <button class="btn btn-ghost" onclick="closeModal('mAdminImport')">取消</button>
+      <button class="btn btn-solid" onclick="doAdminImport()">开始导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 管理员批量修改 MODAL ══ -->
+<div class="modal-bg" id="mAdminBatchUpdate">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-head">
+      <div class="modal-title">✏ 批量修改管理员</div>
+      <button class="modal-close" onclick="closeModal('mAdminBatchUpdate')">×</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--dim);margin-bottom:14px" id="adminBuHint"></div>
+      <div class="fg">
+        <div class="ff">
+          <label><input type="checkbox" id="buAdminRoleChk" style="margin-right:6px;accent-color:var(--cyan)">修改角色名称</label>
+          <input type="text" id="buAdminRole" placeholder="角色名称（留空则清除）"
+            style="margin-top:6px;opacity:.4;pointer-events:none">
+        </div>
+      </div>
+      <div class="fg">
+        <div class="ff">
+          <label><input type="checkbox" id="buAdminActiveChk" style="margin-right:6px;accent-color:var(--cyan)">批量启用/禁用</label>
+          <select id="buAdminActive" style="margin-top:6px;opacity:.4;pointer-events:none">
+            <option value="1">✅ 启用账号</option>
+            <option value="0">🔒 禁用账号</option>
+          </select>
+        </div>
+      </div>
+      <div class="fg">
+        <div class="ff">
+          <label><input type="checkbox" id="buAdminPermChk" style="margin-right:6px">覆盖独立权限</label>
+          <div class="perm-grid" id="buAdminPermGrid" style="margin-top:8px;opacity:.5;pointer-events:none"></div>
+        </div>
+      </div>
+      <div class="fg">
+        <div class="ff">
+          <label><input type="checkbox" id="buAdminPwdChk" style="margin-right:6px">重置密码</label>
+          <input type="text" id="buAdminPwd" placeholder="新密码（至少6位）"
+            style="margin-top:6px;opacity:.5;pointer-events:none">
+        </div>
+      </div>
+      <div style="margin-top:12px;padding:10px 14px;background:#fff8e1;border-radius:8px;
+                  border:1px solid #f9a825;font-size:12px;color:#e65100">
+        ⚠ 仅勾选的项目会被修改，未勾选项保持原值不变
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost" onclick="closeModal('mAdminBatchUpdate')">取消</button>
+      <button class="btn btn-solid" onclick="doAdminBatchUpdate()">确认批量修改</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ==================== 常量定义 ====================
 const SHIRT_CLR={XS:'#c084fc',S:'#60a5fa',M:'#34d399',L:'#fbbf24',XL:'#f87171',XXL:'#f472b6'}
-// 新增赛事包颜色映射
-const package_CLR={'标准包':'#34d399','高级包':'#7c3aed','不含赛事包':'#f87171'}
+const package_CLR={'套装1':'#34d399','套装2':'#7c3aed','无':'#f87171'}
 
 const ALL_FIELDS=[
   {k:'name',l:'姓名'},{k:'player_no',l:'报名编号'},{k:'account',l:'账号'},
   {k:'school',l:'学校'},{k:'grade',l:'年级'},{k:'group_name',l:'组别'},
   {k:'comp_date',l:'比赛日期'},{k:'session',l:'场次'},{k:'seat_no',l:'座位号'},
-  {k:'shirt_size',l:'衣服尺码'},{k:'package',l:'赛事包'},{k:'remark',l:'备注'}  // 添加package
+  {k:'shirt_size',l:'衣服尺码'},{k:'package',l:'赛事包'},{k:'remark',l:'备注'}
 ]
 
 const PERMS=[
@@ -1070,13 +1199,31 @@ const FL={
 }
 
 // ==================== 全局变量 ====================
-let ME=null, COMPS=[], curCid=null
-let editComp=null, editPlayer=null, editAdmin=null
-let selDispFields=[], adminPerms={}
-let customFields = []  // 赛事自定义字段
-let playerCustomData = {}  // 选手自定义数据
-let customFields = []  // 所有自定义字段
-let customFieldsDisplay = []  // 要在签到页显示的自定义字段  ← 在这里添加
+let ME = null
+let COMPS = []
+let curCid = null
+let editComp = null
+let editPlayer = null
+let editAdmin = null
+let selDispFields = []
+let adminPerms = {}
+let customFields = []           // 赛事自定义字段
+let playerCustomData = {}       // 选手自定义数据
+let customFieldsDisplay = []    // 要在签到页显示的自定义字段
+let descImgData = []            // 说明图片数据
+let compAdminPerms = {}         // 赛事管理员权限
+let ALL_ADMINS = []             // 所有管理员
+let buAdminPerms = {}           // 批量修改管理员权限
+
+// ==================== 工具函数 ====================
+function esc(s){
+  if(s === null || s === undefined) return ''
+  return String(s).replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')
+}
 
 // ==================== 初始化 ====================
 async function init(){
@@ -1171,8 +1318,6 @@ async function batchDelComps(){
 }
 
 // ==================== 说明图片上传 ====================
-let descImgData = []
-
 function renderDescImgPreview(){
   const box = document.getElementById('descImgPreview')
   if(!box) return
@@ -1213,9 +1358,6 @@ function onDescImgSelect(input){
 }
 
 // ==================== 子管理员权限 ====================
-let ALL_ADMINS=[]
-let compAdminPerms={}
-
 async function loadAllAdmins(){
   const r=await fetch('/api/admins'); if(r.ok) ALL_ADMINS=await r.json()
 }
@@ -1271,8 +1413,6 @@ function renderCustomFieldsChips(fields){
     return
   }
   
-  document.getElementById('customFieldDisplayContainer').style.display = 'block'
-  
   box.innerHTML = fields.map(f => `
     <div class="chip on" style="position:relative;padding-right:24px;margin-bottom:4px" 
          onclick="removeCustomField('${f.replace(/'/g, "\\'")}')">
@@ -1284,10 +1424,18 @@ function renderCustomFieldsChips(fields){
   // 渲染显示控制
   renderCustomFieldDisplayChips(fields)
 }
-// 渲染自定义字段显示控制
+
 function renderCustomFieldDisplayChips(fields){
   const container = document.getElementById('cCustomFieldDisplayChips')
   if(!container) return
+  
+  if(!fields || !fields.length){
+    container.innerHTML = ''
+    document.getElementById('customFieldDisplayContainer').style.display = 'none'
+    return
+  }
+  
+  document.getElementById('customFieldDisplayContainer').style.display = 'block'
   
   container.innerHTML = fields.map(f => `
     <div class="chip${customFieldsDisplay.includes(f) ? ' on' : ''}" 
@@ -1297,7 +1445,6 @@ function renderCustomFieldDisplayChips(fields){
   `).join('')
 }
 
-// 切换自定义字段显示状态
 function toggleCustomFieldDisplay(field, el){
   if(customFieldsDisplay.includes(field)){
     customFieldsDisplay = customFieldsDisplay.filter(f => f !== field)
@@ -1307,33 +1454,34 @@ function toggleCustomFieldDisplay(field, el){
     el.classList.add('on')
   }
 }
-// 添加自定义字段
+
 function addCustomField(){
   const inp = document.getElementById('newCustomField')
   const val = inp.value.trim()
   if(!val){toast('请输入字段名','err');return}
-  // 允许中文、字母、数字、下划线
+  
   if(!/^[\u4e00-\u9fa5a-zA-Z0-9_]+$/.test(val)){
     toast('字段名只能包含中文、字母、数字和下划线','err')
     return
   }
-    if(val.length > 20){
+  
+  if(val.length > 20){
     toast('字段名不能超过20个字符','err')
     return
   }
+  
   if(customFields.includes(val)){
     toast('字段已存在','err')
     return
   }
+  
   customFields.push(val)
-  // 默认添加到显示列表
   customFieldsDisplay.push(val)
-
+  
   renderCustomFieldsChips(customFields)
   inp.value = ''
 }
 
-// 删除自定义字段
 function removeCustomField(field){
   customFields = customFields.filter(f => f !== field)
   customFieldsDisplay = customFieldsDisplay.filter(f => f !== field)
@@ -1367,7 +1515,7 @@ async function doCompImport(){
 // ==================== 赛事编辑 ====================
 function openCompModal(){
   editComp=null; 
-  selDispFields=['name','school','group_name','session','seat_no','shirt_size','kit']
+  selDispFields=['name','school','group_name','session','seat_no','shirt_size','package']
   compAdminPerms={}
   customFields = []
   customFieldsDisplay = []
@@ -1561,11 +1709,10 @@ function renderCustomFilters(comp){
   }
   const fields = JSON.parse(comp.custom_fields)
   container.innerHTML = fields.map(f => {
-    // 将中文转换为安全的字符串用于ID
     const safeId = 'f_custom_' + f.replace(/[^\w\u4e00-\u9fa5]/g, '_')
     return `
       <select id="${safeId}" onchange="loadPlayers()" style="min-width:100px">
-        <option value="">所有${f}</option>
+        <option value="">所有${esc(f)}</option>
       </select>
     `
   }).join('')
@@ -1578,10 +1725,29 @@ function loadCustomFilterValues(players, customFields){
     if(!sel) continue
     const values = [...new Set(players.map(p => p.custom_data?.[cf]).filter(Boolean))]
     const current = sel.value
-    sel.innerHTML = `<option value="">所有${cf}</option>` + 
+    sel.innerHTML = `<option value="">所有${esc(cf)}</option>` + 
       values.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('')
     if(current) sel.value = current
   }
+}
+
+function renderCustomFieldsInModal(customFields, customData){
+  const container = document.getElementById('customFieldsContainer')
+  if(!container) return
+  if(!customFields || !customFields.length){
+    container.innerHTML = ''
+    return
+  }
+  container.innerHTML = customFields.map(f => {
+    const safeId = 'cf_' + f.replace(/[^\w\u4e00-\u9fa5]/g, '_')
+    return `
+      <div class="ff">
+        <label>${esc(f)}</label>
+        <input type="text" id="${safeId}" class="custom-field-input" 
+               value="${esc(customData[f]||'')}" placeholder="请输入${esc(f)}">
+      </div>
+    `
+  }).join('')
 }
 
 async function loadPlayers(){
@@ -1598,7 +1764,8 @@ async function loadPlayers(){
     renderCustomFilters(comp)
   }
   
-  const params=new URLSearchParams({competition_id:cid,
+  const params=new URLSearchParams({
+    competition_id:cid,
     search:document.getElementById('fSearch').value,
     group:document.getElementById('fGroup').value,
     school:document.getElementById('fSchool').value,
@@ -1606,7 +1773,7 @@ async function loadPlayers(){
     date:document.getElementById('fDate').value,
     session:document.getElementById('fSession').value,
     shirt:document.getElementById('fShirt').value,
-    kit:document.getElementById('fKit').value,
+    package:document.getElementById('fpackage').value,
     checked:document.getElementById('fChecked').value
   })
   
@@ -1620,106 +1787,88 @@ async function loadPlayers(){
     }
   }
   
-  fetch(`/api/players?${params}`)
-    .then(r => r.json())
-    .then(players => {
-      if(comp){
-        document.getElementById('playerSub').textContent=`${comp.name} · 共 ${players.length} 人`
-        const grps=JSON.parse(comp.groups||'[]')
-        const gs=document.getElementById('fGroup'),gv=gs.value
-        gs.innerHTML='<option value="">所有组别</option>'+grps.map(g=>`<option>${esc(g)}</option>`).join('')
-        if(gv)gs.value=gv
-        
-        // 解析自定义字段列表
-        const customFieldsList = JSON.parse(comp.custom_fields || '[]')
-        
-        // 填充筛选下拉框
-        const fillSel=(id,vals,label)=>{
-          const s=document.getElementById(id),v=s.value
-          s.innerHTML=`<option value="">${label}</option>`+[...new Set(vals.filter(Boolean))].sort().map(o=>`<option>${esc(o)}</option>`).join('')
-          if(v)s.value=v
+  const r=await fetch(`/api/players?${params}`)
+  if(!r.ok){toast('权限不足','err');return}
+  const players=await r.json()
+  
+  if(comp){
+    document.getElementById('playerSub').textContent=`${comp.name} · 共 ${players.length} 人`
+    const grps=JSON.parse(comp.groups||'[]')
+    const gs=document.getElementById('fGroup'),gv=gs.value
+    gs.innerHTML='<option value="">所有组别</option>'+grps.map(g=>`<option>${esc(g)}</option>`).join('')
+    if(gv)gs.value=gv
+    
+    // 解析自定义字段列表
+    const customFieldsList = JSON.parse(comp.custom_fields || '[]')
+    
+    // 填充筛选下拉框
+    const fillSel=(id,vals,label)=>{
+      const s=document.getElementById(id),v=s.value
+      s.innerHTML=`<option value="">${label}</option>`+[...new Set(vals.filter(Boolean))].sort().map(o=>`<option>${esc(o)}</option>`).join('')
+      if(v)s.value=v
+    }
+    fillSel('fSchool',players.map(p=>p.school),'所有学校')
+    fillSel('fGrade', players.map(p=>p.grade), '所有年级')
+    fillSel('fDate',  players.map(p=>p.comp_date),'所有日期')
+    fillSel('fSession',players.map(p=>p.session),'所有场次')
+    fillSel('fpackage', players.map(p=>p.package),'所有赛事包')
+    
+    // 填充自定义字段筛选值
+    if(customFieldsList.length){
+      loadCustomFilterValues(players, customFieldsList)
+    }
+    
+    // 构建表头
+    const baseCols = ['player_no','account','name','school','grade','group_name',
+                      'comp_date','session','seat_no','shirt_size','package','checked_in','checkin_time','remark']
+    const allCols = [...baseCols, ...customFieldsList.map(f => `custom_${f}`)]
+    
+    document.getElementById('playerHead').innerHTML=`<tr>
+      <th style="width:36px"><input type="checkbox" id="pSelAll" onchange="toggleSelAllPlayers(this)"></th>
+      ${allCols.map(c => {
+        if(c.startsWith('custom_')){
+          const fieldName = c.replace('custom_', '')
+          return `<th>${esc(fieldName)}</th>`
         }
-        fillSel('fSchool',players.map(p=>p.school),'所有学校')
-        fillSel('fGrade', players.map(p=>p.grade), '所有年级')
-        fillSel('fDate',  players.map(p=>p.comp_date),'所有日期')
-        fillSel('fSession',players.map(p=>p.session),'所有场次')
-        fillSel('fKit', players.map(p=>p.kit),'所有赛事包')
-        
-        // 填充自定义字段筛选值
-        if(customFieldsList.length){
-          loadCustomFilterValues(players, customFieldsList)
+        return `<th>${FL[c]||c}</th>`
+      }).join('')}<th>操作</th></tr>`
+    
+    if(!players.length){
+      document.getElementById('playerTbody').innerHTML=`<tr><td colspan="${allCols.length+2}"><div class="empty"><div class="empty-ico">👥</div><div class="empty-txt">暂无选手数据</div></div></td></tr>`
+      return
+    }
+    
+    document.getElementById('playerTbody').innerHTML=players.map(p=>{
+      const cells = allCols.map(c => {
+        if(c === 'checked_in'){
+          return`<td><span class="tag ${p.checked_in?'t-green':'t-amber'}">${p.checked_in?'✓ 已签到':'⏳ 待签到'}</span></td>`
         }
-        
-        // 构建表头
-        const baseCols = ['player_no','account','name','school','grade','group_name',
-                          'comp_date','session','seat_no','shirt_size','kit','checked_in','checkin_time','remark']
-        const allCols = [...baseCols, ...customFieldsList.map(f => `custom_${f}`)]
-        
-        document.getElementById('playerHead').innerHTML=`<tr>
-          <th style="width:36px"><input type="checkbox" id="pSelAll" onchange="toggleSelAllPlayers(this)"></th>
-          ${allCols.map(c => {
-            if(c.startsWith('custom_')){
-              const fieldName = c.replace('custom_', '')
-              return `<th>${esc(fieldName)}</th>`
-            }
-            return `<th>${FL[c]||c}</th>`
-          }).join('')}<th>操作</th></tr>`
-        
-        if(!players.length){
-          document.getElementById('playerTbody').innerHTML=`<tr><td colspan="${allCols.length+2}"><div class="empty"><div class="empty-ico">👥</div><div class="empty-txt">暂无选手数据</div></div></td></tr>`
-          return
+        if(c === 'shirt_size' && p[c]){
+          const cl=SHIRT_CLR[p[c]]||'#7a9bb5'
+          return`<td><span style="background:${cl}15;color:${cl};padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;border:1px solid ${cl}25">${p[c]}</span></td>`
         }
-        
-        document.getElementById('playerTbody').innerHTML=players.map(p=>{
-          const cells = allCols.map(c => {
-            if(c === 'checked_in'){
-              return`<td><span class="tag ${p.checked_in?'t-green':'t-amber'}">${p.checked_in?'✓ 已签到':'⏳ 待签到'}</span></td>`
-            }
-            if(c === 'shirt_size' && p[c]){
-              const cl=SHIRT_CLR[p[c]]||'#7a9bb5'
-              return`<td><span style="background:${cl}15;color:${cl};padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;border:1px solid ${cl}25">${p[c]}</span></td>`
-            }
-            if(c === 'kit' && p[c]){
-              const cl=KIT_CLR[p[c]]||'#7a9bb5'
-              return`<td><span style="background:${cl}15;color:${cl};padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;border:1px solid ${cl}25">${p[c]}</span></td>`
-            }
-            if(c.startsWith('custom_')){
-              const fieldName = c.replace('custom_', '')
-              return `<td>${esc(p.custom_data?.[fieldName] || '—')}</td>`
-            }
-            return`<td>${esc(String(p[c]||'—'))}</td>`
-          }).join('')
-          
-          const chked=SEL_IDS.has(p.id)?'checked':''
-          return`<tr>
-            <td><input type="checkbox" class="p-chk" value="${p.id}" ${chked} onchange="onPlayerChk(this)"></td>
-            ${cells}<td>
-              <div style="display:flex;gap:5px">
-                <button class="btn btn-cyan btn-xs" onclick='editPlayerFn(${JSON.stringify(p).replace(/'/g,"&#39;")})'>编辑</button>
-                <button class="btn btn-red btn-xs" onclick="delPlayer(${p.id})">删除</button>
-              </div>
-            </td></tr>`
-        }).join('')
-      }
-    })
-    .catch(err => {
-      toast('权限不足','err')
-    })
-}
-
-function renderCustomFieldsInModal(customFields, customData){
-  const container = document.getElementById('customFieldsContainer')
-  if(!container) return
-  if(!customFields || !customFields.length){
-    container.innerHTML = ''
-    return
+        if(c === 'package' && p[c]){
+          const cl=package_CLR[p[c]]||'#7a9bb5'
+          return`<td><span style="background:${cl}15;color:${cl};padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;border:1px solid ${cl}25">${p[c]}</span></td>`
+        }
+        if(c.startsWith('custom_')){
+          const fieldName = c.replace('custom_', '')
+          return `<td>${esc(p.custom_data?.[fieldName] || '—')}</td>`
+        }
+        return`<td>${esc(String(p[c]||'—'))}</td>`
+      }).join('')
+      
+      const chked=SEL_IDS.has(p.id)?'checked':''
+      return`<tr>
+        <td><input type="checkbox" class="p-chk" value="${p.id}" ${chked} onchange="onPlayerChk(this)"></td>
+        ${cells}<td>
+          <div style="display:flex;gap:5px">
+            <button class="btn btn-cyan btn-xs" onclick='editPlayerFn(${JSON.stringify(p).replace(/'/g,"&#39;")})'>编辑</button>
+            <button class="btn btn-red btn-xs" onclick="delPlayer(${p.id})">删除</button>
+          </div>
+        </td></tr>`
+    }).join('')
   }
-  container.innerHTML = customFields.map(f => `
-    <div class="ff">
-      <label>${f}</label>
-      <input type="text" id="cf_${f}" class="custom-field-input" value="${esc(customData[f]||'')}" placeholder="请输入${f}">
-    </div>
-  `).join('')
 }
 
 function openPlayerModal(){
@@ -1774,7 +1923,8 @@ async function savePlayer(){
   if(comp && comp.custom_fields){
     const fields = JSON.parse(comp.custom_fields)
     for(const f of fields){
-      customData[f] = document.getElementById(`cf_${f}`)?.value || ''
+      const safeId = 'cf_' + f.replace(/[^\w\u4e00-\u9fa5]/g, '_')
+      customData[f] = document.getElementById(safeId)?.value || ''
     }
   }
   
@@ -1982,7 +2132,7 @@ async function loadStats(){
     : '<div style="color:var(--dim);font-size:12px;padding:8px 0">暂无数据</div>'
 
   // 赛事包统计
-  const package_COLORS={'标准包':'#34d399','高级包':'#7c3aed','不含赛事包':'#f87171'}
+  const package_COLORS={'套装1':'#34d399','套装2':'#7c3aed','无':'#f87171'}
   document.getElementById('stpackage').innerHTML=d.by_package.length
     ? d.by_package.map(s=>{
         const c=package_COLORS[s.package]||'#4a7fa5'
@@ -2059,7 +2209,7 @@ function openBatchUpdate(){
       <option value="">请选择</option><option>XS</option><option>S</option><option>M</option>
       <option>L</option><option>XL</option><option>XXL</option></select>`
     else if(f.type==='select_package') inp=`<select id="bf_${f.k}" class="inp" style="flex:1;min-width:0">
-      <option value="">请选择</option><option>标准包</option><option>高级包</option><option>不含赛事包</option></select>`
+      <option value="">请选择</option><option>套装1</option><option>套装2</option><option>无</option></select>`
     else if(f.type==='select_status') inp=`<select id="bf_${f.k}" class="inp" style="flex:1;min-width:0">
       <option value="0">未签到</option><option value="1">已签到</option></select>`
     return`<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;
@@ -2075,14 +2225,18 @@ function openBatchUpdate(){
     const fields = JSON.parse(comp.custom_fields)
     if(fields.length){
       html += '<div style="margin-top:12px;font-size:12px;font-weight:600;color:var(--cyan)">自定义字段</div>'
-      html += fields.map(f => `
-        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;
-                    border-radius:8px;border:1px solid var(--border);background:#f8f4ff">
-          <input type="checkbox" id="bfc_custom_${f}" style="accent-color:var(--purple);width:15px;height:15px;cursor:pointer">
-          <label for="bfc_custom_${f}" style="font-size:13px;font-weight:600;color:var(--text);width:72px;cursor:pointer;flex-shrink:0">${f}</label>
-          <input type="text" id="bf_custom_${f}" class="inp custom-field-input" style="flex:1;min-width:0" placeholder="请输入新值">
-        </div>
-      `).join('')
+      html += fields.map(f => {
+        const safeId = 'bfc_custom_' + f.replace(/[^\w\u4e00-\u9fa5]/g, '_')
+        const inputId = 'bf_custom_' + f.replace(/[^\w\u4e00-\u9fa5]/g, '_')
+        return `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;
+                      border-radius:8px;border:1px solid var(--border);background:#f8f4ff">
+            <input type="checkbox" id="${safeId}" style="accent-color:var(--purple);width:15px;height:15px;cursor:pointer">
+            <label for="${safeId}" style="font-size:13px;font-weight:600;color:var(--text);width:72px;cursor:pointer;flex-shrink:0">${esc(f)}</label>
+            <input type="text" id="${inputId}" class="inp custom-field-input" style="flex:1;min-width:0" placeholder="请输入新值">
+          </div>
+        `
+      }).join('')
     }
   }
   
@@ -2108,9 +2262,11 @@ async function doBatchUpdate(){
   if(comp && comp.custom_fields){
     const cfList = JSON.parse(comp.custom_fields)
     for(const f of cfList){
-      const chk = document.getElementById(`bfc_custom_${f}`)
+      const safeId = 'bfc_custom_' + f.replace(/[^\w\u4e00-\u9fa5]/g, '_')
+      const inputId = 'bf_custom_' + f.replace(/[^\w\u4e00-\u9fa5]/g, '_')
+      const chk = document.getElementById(safeId)
       if(chk && chk.checked){
-        const val = document.getElementById(`bf_custom_${f}`).value
+        const val = document.getElementById(inputId)?.value
         if(val) customFields[f] = val
       }
     }
@@ -2136,7 +2292,6 @@ async function doBatchUpdate(){
 
 // ==================== Admins ====================
 let ADMINS_ALL = []
-let buAdminPerms = {}
 
 async function loadAdmins(){
   const r=await fetch('/api/admins'); if(!r.ok)return
@@ -2403,148 +2558,9 @@ function toast(msg,type='ok'){
 
 async function logout(){await fetch('/api/admin/logout',{method:'POST'});location.href='/admin'}
 
-function esc(s){
-  if(s === null || s === undefined) return ''
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;')}
-
 // ==================== 启动 ====================
 init()
 </script>
-
-<!-- ══ 批量修改弹窗 ══ -->
-<div class="modal-bg" id="mBatchUpdate">
-  <div class="modal" style="max-width:520px">
-    <div class="modal-head">
-      <div class="modal-title">✏ 批量修改选手信息</div>
-      <button class="modal-close" onclick="closeModal('mBatchUpdate')">×</button>
-    </div>
-    <div class="modal-body">
-      <div style="font-size:12px;color:var(--dim);margin-bottom:14px" id="buHint"></div>
-      <div style="display:grid;gap:10px" id="buGrid"></div>
-      <div style="margin-top:14px;padding:10px 14px;background:#fff8e1;border-radius:8px;
-                  border:1px solid #f9a825;font-size:12px;color:#e65100">
-        ⚠ 仅勾选的字段会被覆盖，未勾选字段保持原值不变
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-ghost" onclick="closeModal('mBatchUpdate')">取消</button>
-      <button class="btn btn-solid" onclick="doBatchUpdate()">确认批量修改</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ 批量导入赛事 MODAL ══ -->
-<div class="modal-bg" id="mCompImport">
-  <div class="modal" style="max-width:480px">
-    <div class="modal-head">
-      <div class="modal-title">📤 批量导入赛事</div>
-      <button class="modal-close" onclick="closeModal('mCompImport')">×</button>
-    </div>
-    <div class="modal-body">
-      <div class="fg"><div class="ff">
-        <label>Excel 文件（.xlsx / .xls）</label>
-        <input type="file" id="compImportFile" accept=".xlsx,.xls"
-          onchange="document.getElementById('compImportErrBox').style.display='none'"
-          style="background:var(--card3);border:1.5px dashed rgba(0,150,220,.3);border-radius:9px;padding:14px;cursor:pointer;color:var(--dim)">
-      </div></div>
-      <div style="background:rgba(0,150,220,.04);border:1px solid var(--border);border-radius:9px;padding:12px;font-size:11px;color:var(--dim);line-height:1.9">
-        📋 请先下载模板，按格式填写后上传<br>
-        必填：<strong style="color:#ff6b6b">赛事名称</strong>；支持：地点、时间、欢迎语、组别、说明、云相册链接、负责人、<strong style="color:#7c3aed">自定义字段</strong>等
-      </div>
-      <div id="compImportErrBox" style="display:none;margin-top:10px;background:#fff1f0;
-           border:1px solid #ffa39e;border-left:4px solid #dc2626;border-radius:8px;
-           padding:10px 14px;font-size:12px;color:#a8071a"></div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-ghost" onclick="dlCompTemplate()">📄 下载模板</button>
-      <button class="btn btn-ghost" onclick="closeModal('mCompImport')">取消</button>
-      <button class="btn btn-solid" onclick="doCompImport()">开始导入</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ 批量导入管理员 MODAL ══ -->
-<div class="modal-bg" id="mAdminImport">
-  <div class="modal" style="max-width:480px">
-    <div class="modal-head">
-      <div class="modal-title">📤 批量导入管理员</div>
-      <button class="modal-close" onclick="closeModal('mAdminImport')">×</button>
-    </div>
-    <div class="modal-body">
-      <div class="fg"><div class="ff">
-        <label>Excel 文件（.xlsx / .xls）</label>
-        <input type="file" id="adminImportFile" accept=".xlsx,.xls"
-          onchange="document.getElementById('adminImportErrBox').style.display='none'"
-          style="background:var(--card3);border:1.5px dashed rgba(0,150,220,.3);border-radius:9px;
-                 padding:14px;cursor:pointer;color:var(--dim)">
-      </div></div>
-      <div style="background:rgba(0,150,220,.04);border:1px solid var(--border);border-radius:9px;
-                  padding:12px;font-size:11px;color:var(--dim);line-height:1.9">
-        📋 请先下载模板，填写姓名、手机号、初始密码及权限后上传<br>
-        必填：<strong style="color:#ff6b6b">姓名、手机号、初始密码</strong>（密码至少6位）
-      </div>
-      <div id="adminImportErrBox" style="display:none;margin-top:10px;background:#fff1f0;
-           border:1px solid #ffa39e;border-left:4px solid #dc2626;border-radius:8px;
-           padding:10px 14px;font-size:12px;color:#a8071a"></div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-ghost" onclick="dlAdminTemplate()">📄 下载模板</button>
-      <button class="btn btn-ghost" onclick="closeModal('mAdminImport')">取消</button>
-      <button class="btn btn-solid" onclick="doAdminImport()">开始导入</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ 管理员批量修改 MODAL ══ -->
-<div class="modal-bg" id="mAdminBatchUpdate">
-  <div class="modal" style="max-width:520px">
-    <div class="modal-head">
-      <div class="modal-title">✏ 批量修改管理员</div>
-      <button class="modal-close" onclick="closeModal('mAdminBatchUpdate')">×</button>
-    </div>
-    <div class="modal-body">
-      <div style="font-size:12px;color:var(--dim);margin-bottom:14px" id="adminBuHint"></div>
-      <div class="fg">
-        <div class="ff">
-          <label><input type="checkbox" id="buAdminRoleChk" style="margin-right:6px;accent-color:var(--cyan)">修改角色名称</label>
-          <input type="text" id="buAdminRole" placeholder="角色名称（留空则清除）"
-            style="margin-top:6px;opacity:.4;pointer-events:none">
-        </div>
-      </div>
-      <div class="fg">
-        <div class="ff">
-          <label><input type="checkbox" id="buAdminActiveChk" style="margin-right:6px;accent-color:var(--cyan)">批量启用/禁用</label>
-          <select id="buAdminActive" style="margin-top:6px;opacity:.4;pointer-events:none">
-            <option value="1">✅ 启用账号</option>
-            <option value="0">🔒 禁用账号</option>
-          </select>
-        </div>
-      </div>
-      <div class="fg">
-        <div class="ff">
-          <label><input type="checkbox" id="buAdminPermChk" style="margin-right:6px">覆盖独立权限</label>
-          <div class="perm-grid" id="buAdminPermGrid" style="margin-top:8px;opacity:.5;pointer-events:none"></div>
-        </div>
-      </div>
-      <div class="fg">
-        <div class="ff">
-          <label><input type="checkbox" id="buAdminPwdChk" style="margin-right:6px">重置密码</label>
-          <input type="text" id="buAdminPwd" placeholder="新密码（至少6位）"
-            style="margin-top:6px;opacity:.5;pointer-events:none">
-        </div>
-      </div>
-      <div style="margin-top:12px;padding:10px 14px;background:#fff8e1;border-radius:8px;
-                  border:1px solid #f9a825;font-size:12px;color:#e65100">
-        ⚠ 仅勾选的项目会被修改，未勾选项保持原值不变
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-ghost" onclick="closeModal('mAdminBatchUpdate')">取消</button>
-      <button class="btn btn-solid" onclick="doAdminBatchUpdate()">确认批量修改</button>
-    </div>
-  </div>
-</div>
 
 </body>
 </html>
