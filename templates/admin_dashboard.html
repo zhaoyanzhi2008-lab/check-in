@@ -66,8 +66,8 @@ body::before{
 .sb-vr{font-size:10px;color:var(--dim);letter-spacing:1px;margin-top:2px}
 
 .sb-nav{flex:1;padding:12px 8px;overflow-y:auto}
-.sb-nav::-webkit-scrollbar{width:3px}
-.sb-nav::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.sb-nav::-webpackage-scrollbar{width:3px}
+.sb-nav::-webpackage-scrollbar-thumb{background:var(--border);border-radius:2px}
 
 .sb-section{margin-bottom:22px}
 .sb-sl{
@@ -297,8 +297,8 @@ tbody tr:last-child td{border-bottom:none}
   max-height:92vh;overflow-y:auto;
   box-shadow:0 20px 60px rgba(0,80,160,.15);
 }
-.modal::-webkit-scrollbar{width:4px}
-.modal::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.modal::-webpackage-scrollbar{width:4px}
+.modal::-webpackage-scrollbar-thumb{background:var(--border);border-radius:2px}
 .modal-head{
   padding:18px 22px;border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;
@@ -419,6 +419,27 @@ tbody tr:last-child td{border-bottom:none}
 .empty-txt{font-size:14px;font-weight:600;margin-bottom:4px}
 .empty-sub{font-size:12px;opacity:.6}
 
+/* ── CUSTOM FIELDS ──────────────────── */
+.custom-field-badge{
+  background:rgba(124,58,237,.1);
+  color:#7c3aed;
+  border:1px solid rgba(124,58,237,.3);
+  padding:2px 8px;
+  border-radius:12px;
+  font-size:10px;
+  display:inline-block;
+  margin-right:4px;
+  margin-bottom:4px;
+}
+.custom-field-input{
+  background:#f8f4ff;
+  border:1.5px solid rgba(124,58,237,.2);
+}
+.custom-field-input:focus{
+  border-color:#7c3aed;
+  box-shadow:0 0 0 3px rgba(124,58,237,.1);
+}
+
 /* ── RESPONSIVE ─────────────────────── */
 @media(max-width:900px){
   .sidebar{transform:translateX(-100%)}
@@ -457,7 +478,7 @@ tbody tr:last-child td{border-bottom:none}
     </div>
     <div>
       <div class="sb-nm">ICODE</div>
-      <div class="sb-vr">v3.4 · ADMIN</div>
+      <div class="sb-vr">v3.5 · ADMIN</div>
     </div>
   </div>
   <nav class="sb-nav">
@@ -555,6 +576,13 @@ tbody tr:last-child td{border-bottom:none}
             <option value="">所有尺码</option>
             <option>XS</option><option>S</option><option>M</option><option>L</option><option>XL</option><option>XXL</option>
           </select>
+          <!-- 新增赛事包筛选 -->
+          <select id="fpackage" onchange="loadPlayers()">
+            <option value="">所有赛事包</option>
+            <option>套装1</option><option>套装2</option><option>无</option>
+          </select>
+          <!-- 自定义字段筛选容器 -->
+          <div id="customFilterContainer" style="display:flex;gap:8px;flex-wrap:wrap"></div>
           <select id="fChecked" onchange="loadPlayers()">
             <option value="">全部状态</option>
             <option value="0">未签到</option>
@@ -699,11 +727,16 @@ tbody tr:last-child td{border-bottom:none}
         </div>
       </div>
 
-      <!-- Shirt + Recent side by side -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+      <!-- Shirt + package + Recent -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
         <div class="card" style="margin:0">
           <div class="card-head"><div class="card-title">👕 衣服尺码分布</div></div>
           <div class="card-body"><div id="stShirt" style="display:flex;flex-wrap:wrap;gap:10px"></div></div>
+        </div>
+        <!-- 新增赛事包统计 -->
+        <div class="card" style="margin:0">
+          <div class="card-head"><div class="card-title">🎒 赛事包分布</div></div>
+          <div class="card-body"><div id="stpackage" style="display:flex;flex-wrap:wrap;gap:10px"></div></div>
         </div>
         <div class="card" style="margin:0">
           <div class="card-head">
@@ -820,6 +853,20 @@ tbody tr:last-child td{border-bottom:none}
       <div class="fg">
         <div class="ff"><label>组别（逗号分隔）</label><input id="cGroups" placeholder="初级组,中级组,高级组"></div>
       </div>
+      
+      <!-- 新增：自定义字段管理 -->
+      <div class="fg">
+        <div class="ff">
+          <label>自定义字段（管理员可添加额外字段）</label>
+          <div class="chips" id="cCustomFieldsChips" style="margin-top:4px"></div>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <input type="text" id="newCustomField" placeholder="新字段名（英文）" style="flex:1;padding:8px;border:1px solid var(--border);border-radius:6px">
+            <button class="btn btn-cyan btn-xs" type="button" onclick="addCustomField()">添加</button>
+          </div>
+          <span class="hint">自定义字段将在导入模板、选手列表和导出中自动出现。字段名请使用英文。</span>
+        </div>
+      </div>
+
       <div class="fg c2">
         <div class="ff">
           <label>查询字段</label>
@@ -872,7 +919,7 @@ tbody tr:last-child td{border-bottom:none}
   </div>
 </div>
 
-<!-- ══ PLAYER MODAL ══ -->
+<!-- ══ PLAYER MODAL ══ (新增赛事包字段) -->
 <div class="modal-bg" id="mPlayer">
   <div class="modal">
     <div class="modal-head"><div class="modal-title" id="mPlayerT">新增选手</div><button class="modal-close" onclick="closeModal('mPlayer')">×</button></div>
@@ -897,12 +944,18 @@ tbody tr:last-child td{border-bottom:none}
         <div class="ff"><label>场次</label><input id="pSession" placeholder="上午场"></div>
         <div class="ff"><label>座位号</label><input id="pSeat" placeholder="A-001"></div>
       </div>
-      <div class="fg c2">
+      <!-- 新增赛事包字段 -->
+      <div class="fg c3">
+        <div class="ff"><label>赛事包</label>
+          <select id="ppackage"><option value="">—</option><option>标准包</option><option>高级包</option><option>不含赛事包</option></select>
+        </div>
         <div class="ff"><label>签到状态</label>
           <select id="pChkd"><option value="0">未签到</option><option value="1">已签到</option></select>
         </div>
         <div class="ff"><label>备注</label><input id="pRemark" placeholder="备注信息"></div>
       </div>
+      <!-- 自定义字段容器 -->
+      <div id="customFieldsContainer" style="margin-top:12px;display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-ghost" onclick="closeModal('mPlayer')">取消</button>
@@ -923,8 +976,9 @@ tbody tr:last-child td{border-bottom:none}
           style="background:var(--card3);border:1.5px dashed rgba(0,150,220,.3);border-radius:9px;padding:14px;cursor:pointer;color:var(--dim)">
       </div></div>
       <div style="background:rgba(0,150,220,.04);border:1px solid var(--border);border-radius:9px;padding:12px;font-size:11px;color:var(--dim);line-height:1.9">
-        📋 第一行为表头，支持列：报名编号、账号、<strong style="color:#ff6b6b">姓名（必填）</strong>、学校、年级、组别、比赛日期、场次、座位号、衣服尺码、备注<br>
-        ⚠ 报名编号或账号重复将拒绝整批导入；组别须与赛事设定的组别一致
+        📋 第一行为表头，支持列：报名编号、账号、<strong style="color:#ff6b6b">姓名（必填）</strong>、学校、年级、组别、比赛日期、场次、座位号、衣服尺码、<strong style="color:#7c3aed">赛事包</strong>、备注<br>
+        ⚠ 报名编号或账号重复将拒绝整批导入；组别须与赛事设定的组别一致<br>
+        💡 如果赛事设置了自定义字段，模板中会自动包含这些字段列
       </div>
       <div id="importErrBox" style="display:none;margin-top:12px;background:#fff1f0;
            border:1px solid #ffa39e;border-left:4px solid #dc2626;border-radius:8px;
@@ -982,26 +1036,38 @@ tbody tr:last-child td{border-bottom:none}
 </div>
 
 <script>
+// ==================== 常量定义 ====================
 const SHIRT_CLR={XS:'#c084fc',S:'#60a5fa',M:'#34d399',L:'#fbbf24',XL:'#f87171',XXL:'#f472b6'}
+// 新增赛事包颜色映射
+const package_CLR={'标准包':'#34d399','高级包':'#7c3aed','不含赛事包':'#f87171'}
+
 const ALL_FIELDS=[
   {k:'name',l:'姓名'},{k:'player_no',l:'报名编号'},{k:'account',l:'账号'},
   {k:'school',l:'学校'},{k:'grade',l:'年级'},{k:'group_name',l:'组别'},
   {k:'comp_date',l:'比赛日期'},{k:'session',l:'场次'},{k:'seat_no',l:'座位号'},
-  {k:'shirt_size',l:'衣服尺码'},{k:'remark',l:'备注'}
+  {k:'shirt_size',l:'衣服尺码'},{k:'package',l:'赛事包'},{k:'remark',l:'备注'}  // 添加package
 ]
+
 const PERMS=[
   {k:'add_competition',l:'添加赛事'},{k:'import_players',l:'导入选手'},
   {k:'view_players',l:'查看选手'},{k:'edit_players',l:'修改选手'},
   {k:'checkin_stats',l:'查看统计'},{k:'manage_admins',l:'人员管理'}
 ]
-const FL={name:'姓名',player_no:'报名编号',account:'账号',school:'学校',grade:'年级',
-  group_name:'组别',comp_date:'日期',session:'场次',seat_no:'座位号',
-  shirt_size:'尺码',checked_in:'签到',checkin_time:'签到时间',remark:'备注'}
 
+const FL={
+  name:'姓名',player_no:'报名编号',account:'账号',school:'学校',grade:'年级',
+  group_name:'组别',comp_date:'日期',session:'场次',seat_no:'座位号',
+  shirt_size:'尺码',package:'赛事包',checked_in:'签到',checkin_time:'签到时间',remark:'备注'
+}
+
+// ==================== 全局变量 ====================
 let ME=null, COMPS=[], curCid=null
 let editComp=null, editPlayer=null, editAdmin=null
 let selDispFields=[], adminPerms={}
+let customFields = []  // 赛事自定义字段
+let playerCustomData = {}  // 选手自定义数据
 
+// ==================== 初始化 ====================
 async function init(){
   const r=await fetch('/api/admin/me')
   if(!r.ok){location.href='/admin';return}
@@ -1014,11 +1080,11 @@ async function init(){
   await loadComps()
 }
 
-// ─ Competitions ────────────────────────────────────────────────
+// ==================== Competitions ====================
 async function loadComps(){
   const r=await fetch('/api/competitions')
   COMPS=await r.json()
-  // 填充地点筛选（赛项面板 + 统计面板）
+  // 填充地点筛选
   const locs=[...new Set(COMPS.map(c=>c.location).filter(Boolean))]
   ;['cLocFilter','stLocSel'].forEach(id=>{
     const s=document.getElementById(id); if(!s)return
@@ -1093,8 +1159,8 @@ async function batchDelComps(){
   else{const d=await r.json();toast(d.error||'删除失败','err')}
 }
 
-// ─── 说明图片上传处理 ─────────────────────────────────────────
-let descImgData = []  // 存 base64 字符串数组
+// ==================== 说明图片上传 ====================
+let descImgData = []
 
 function renderDescImgPreview(){
   const box = document.getElementById('descImgPreview')
@@ -1135,7 +1201,7 @@ function onDescImgSelect(input){
   input.value = ''
 }
 
-// ─── 子管理员权限分配 ─────────────────────────────────────────
+// ==================== 子管理员权限 ====================
 let ALL_ADMINS=[]
 let compAdminPerms={}
 
@@ -1183,7 +1249,41 @@ function onCAChk(aid,cb){
   }
 }
 
-// ─── 功能5：批量导入赛事 ───────────────────────────────────────
+// ==================== 自定义字段管理 ====================
+function renderCustomFieldsChips(fields){
+  const box = document.getElementById('cCustomFieldsChips')
+  if(!box) return
+  box.innerHTML = fields.map(f => `
+    <div class="chip on" style="position:relative;padding-right:24px" onclick="removeCustomField('${f}')">
+      ${f}
+      <span style="position:absolute;right:6px;top:3px;font-size:12px;color:var(--dim)">×</span>
+    </div>
+  `).join('')
+}
+
+function addCustomField(){
+  const inp = document.getElementById('newCustomField')
+  const val = inp.value.trim()
+  if(!val){toast('请输入字段名','err');return}
+  if(!/^[\u4e00-\u9fa5a-zA-Z0-9_]+$/.test(val)){
+    toast('字段名只能包含中文、字母、数字和下划线','err')
+    return
+  }
+  if(customFields.includes(val)){
+    toast('字段已存在','err')
+    return
+  }
+  customFields.push(val)
+  renderCustomFieldsChips(customFields)
+  inp.value = ''
+}
+
+function removeCustomField(field){
+  customFields = customFields.filter(f => f !== field)
+  renderCustomFieldsChips(customFields)
+}
+
+// ==================== 赛事导入 ====================
 function dlCompTemplate(){window.open('/api/competitions/template')}
 
 function openCompImport(){
@@ -1207,9 +1307,11 @@ async function doCompImport(){
   }
 }
 
+// ==================== 赛事编辑 ====================
 function openCompModal(){
-  editComp=null; selDispFields=['name','school','group_name','session','seat_no','shirt_size']
+  editComp=null; selDispFields=['name','school','group_name','session','seat_no','shirt_size','package']
   compAdminPerms={}
+  customFields = []
   document.getElementById('mCompT').textContent='新增赛项'
   ;['cName','cLoc','cDesc','cGroups','cAlbum','cManager'].forEach(i=>document.getElementById(i).value='')
   descImgData=[]; renderDescImgPreview()
@@ -1220,12 +1322,16 @@ function openCompModal(){
   document.getElementById('cQueryField').value='player_no,account'
   document.getElementById('cQueryHint').value='请输入报名编号或选手账号'
   document.getElementById('cActive').value='1'
-  renderCompChips(); renderCompAdminList(); openModal('mComp')
+  renderCompChips()
+  renderCustomFieldsChips([])
+  renderCompAdminList()
+  openModal('mComp')
 }
 
 async function editCompFn(id){
   const c=COMPS.find(x=>x.id===id); if(!c)return
   editComp=c; selDispFields=JSON.parse(c.display_fields||'[]')
+  customFields = JSON.parse(c.custom_fields || '[]')
   document.getElementById('mCompT').textContent='编辑赛项'
   document.getElementById('cName').value=c.name
   document.getElementById('cLoc').value=c.location||''
@@ -1245,6 +1351,7 @@ async function editCompFn(id){
   document.getElementById('cQueryHint').value=c.query_hint||''
   document.getElementById('cActive').value=c.is_active??1
   renderCompChips()
+  renderCustomFieldsChips(customFields)
   renderCompAdminList(JSON.parse(c.comp_admins||'[]'))
   openModal('mComp')
 }
@@ -1284,6 +1391,7 @@ async function saveComp(){
     banner_accent:document.getElementById('cAccColor').value,
     groups:document.getElementById('cGroups').value.split(',').map(g=>g.trim()).filter(Boolean),
     display_fields:selDispFields,
+    custom_fields:customFields,
     query_field:document.getElementById('cQueryField').value||'player_no,account',
     query_hint:document.getElementById('cQueryHint').value,
     is_active:parseInt(document.getElementById('cActive').value)
@@ -1301,7 +1409,7 @@ async function delComp(id){
   await loadComps(); toast('赛项已删除')
 }
 
-// ─ QR ─────────────────────────────────────────────────────────
+// ==================== QR ====================
 function showQR(cid,name){
   const url=location.origin+'/c/'+cid
   document.getElementById('mQRT').textContent=`二维码 · ${name}`
@@ -1331,8 +1439,7 @@ function downloadQR(){
   a.download='ICode签到二维码.png'; a.click()
 }
 
-// ─ Players ────────────────────────────────────────────────────
-// 选中选手ID集合
+// ==================== Players ====================
 let SEL_IDS=new Set()
 
 function updateBatchBar(){
@@ -1363,6 +1470,38 @@ function onPlayerChk(cb){
   updateBatchBar()
 }
 
+function renderCustomFilters(comp){
+  const container = document.getElementById('customFilterContainer')
+  if(!container) return
+  if(!comp || !comp.custom_fields || !comp.custom_fields.length){
+    container.innerHTML = ''
+    return
+  }
+  const fields = JSON.parse(comp.custom_fields)
+  container.innerHTML = fields.map(f => {
+    // 将中文转换为安全的字符串用于ID
+    const safeId = 'f_custom_' + f.replace(/[^\w\u4e00-\u9fa5]/g, '_')
+    return `
+      <select id="${safeId}" onchange="loadPlayers()" style="min-width:100px">
+        <option value="">所有${f}</option>
+      </select>
+    `
+  }).join('')
+}
+
+function loadCustomFilterValues(players, customFields){
+  for(const cf of customFields){
+    const safeId = 'f_custom_' + cf.replace(/[^\w\u4e00-\u9fa5]/g, '_')
+    const sel = document.getElementById(safeId)
+    if(!sel) continue
+    const values = [...new Set(players.map(p => p.custom_data?.[cf]).filter(Boolean))]
+    const current = sel.value
+    sel.innerHTML = `<option value="">所有${cf}</option>` + 
+      values.map(v => `<option value="${esc(v)}">${esc(v)}</option>`).join('')
+    if(current) sel.value = current
+  }
+}
+
 async function loadPlayers(){
   const cid=document.getElementById('pCompSel').value
   if(!cid){
@@ -1370,6 +1509,13 @@ async function loadPlayers(){
     return
   }
   curCid=cid; SEL_IDS.clear(); updateBatchBar()
+  
+  // 获取赛事信息
+  const comp = COMPS.find(c=>c.id==cid)
+  if(comp){
+    renderCustomFilters(comp)
+  }
+  
   const params=new URLSearchParams({competition_id:cid,
     search:document.getElementById('fSearch').value,
     group:document.getElementById('fGroup').value,
@@ -1378,19 +1524,31 @@ async function loadPlayers(){
     date:document.getElementById('fDate').value,
     session:document.getElementById('fSession').value,
     shirt:document.getElementById('fShirt').value,
+    package:document.getElementById('fpackage').value,  // 新增package筛选
     checked:document.getElementById('fChecked').value
   })
+  
+  // 添加自定义字段筛选
+  if(comp && comp.custom_fields){
+    const fields = JSON.parse(comp.custom_fields)
+    for(const cf of fields){
+      const val = document.getElementById(`f_custom_${cf}`)?.value
+      if(val) params.append(`custom_${cf}`, val)
+    }
+  }
+  
   const r=await fetch(`/api/players?${params}`)
   if(!r.ok){toast('权限不足','err');return}
   const players=await r.json()
-  const comp=COMPS.find(c=>c.id==cid)
+  
   if(comp){
     document.getElementById('playerSub').textContent=`${comp.name} · 共 ${players.length} 人`
     const grps=JSON.parse(comp.groups||'[]')
     const gs=document.getElementById('fGroup'),gv=gs.value
     gs.innerHTML='<option value="">所有组别</option>'+grps.map(g=>`<option>${esc(g)}</option>`).join('')
     if(gv)gs.value=gv
-    // 动态填充学校/年级/日期/场次
+    
+    // 填充筛选下拉框
     const fillSel=(id,vals,label)=>{
       const s=document.getElementById(id),v=s.value
       s.innerHTML=`<option value="">${label}</option>`+[...new Set(vals.filter(Boolean))].sort().map(o=>`<option>${esc(o)}</option>`).join('')
@@ -1400,20 +1558,33 @@ async function loadPlayers(){
     fillSel('fGrade', players.map(p=>p.grade), '所有年级')
     fillSel('fDate',  players.map(p=>p.comp_date),'所有日期')
     fillSel('fSession',players.map(p=>p.session),'所有场次')
+    fillSel('fpackage', players.map(p=>p.package),'所有赛事包')
+    
+    // 填充自定义字段筛选值
+    if(comp.custom_fields){
+      loadCustomFilterValues(players, JSON.parse(comp.custom_fields))
+    }
   }
-  const cols=['player_no','account','name','school','grade','group_name','comp_date','session','seat_no','shirt_size','checked_in','checkin_time','remark']
+  
+  const cols=['player_no','account','name','school','grade','group_name','comp_date','session','seat_no','shirt_size','package','checked_in','checkin_time','remark']
   document.getElementById('playerHead').innerHTML=`<tr>
     <th style="width:36px"><input type="checkbox" id="pSelAll" onchange="toggleSelAllPlayers(this)"></th>
     ${cols.map(c=>`<th>${FL[c]||c}</th>`).join('')}<th>操作</th></tr>`
+  
   if(!players.length){
     document.getElementById('playerTbody').innerHTML=`<tr><td colspan="${cols.length+2}"><div class="empty"><div class="empty-ico">👥</div><div class="empty-txt">暂无选手数据</div></div></td></tr>`
     return
   }
+  
   document.getElementById('playerTbody').innerHTML=players.map(p=>{
     const cells=cols.map(c=>{
       if(c==='checked_in')return`<td><span class="tag ${p.checked_in?'t-green':'t-amber'}">${p.checked_in?'✓ 已签到':'⏳ 待签到'}</span></td>`
       if(c==='shirt_size'&&p[c]){
         const cl=SHIRT_CLR[p[c]]||'#7a9bb5'
+        return`<td><span style="background:${cl}15;color:${cl};padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;border:1px solid ${cl}25">${p[c]}</span></td>`
+      }
+      if(c==='package'&&p[c]){
+        const cl=package_CLR[p[c]]||'#7a9bb5'
         return`<td><span style="background:${cl}15;color:${cl};padding:2px 8px;border-radius:5px;font-size:11px;font-weight:700;border:1px solid ${cl}25">${p[c]}</span></td>`
       }
       return`<td>${esc(String(p[c]||'—'))}</td>`
@@ -1430,14 +1601,36 @@ async function loadPlayers(){
   }).join('')
 }
 
+function renderCustomFieldsInModal(customFields, customData){
+  const container = document.getElementById('customFieldsContainer')
+  if(!container) return
+  if(!customFields || !customFields.length){
+    container.innerHTML = ''
+    return
+  }
+  container.innerHTML = customFields.map(f => `
+    <div class="ff">
+      <label>${f}</label>
+      <input type="text" id="cf_${f}" class="custom-field-input" value="${esc(customData[f]||'')}" placeholder="请输入${f}">
+    </div>
+  `).join('')
+}
+
 function openPlayerModal(){
   if(!curCid){toast('请先选择比赛','err');return}
   editPlayer=null
+  playerCustomData = {}
   document.getElementById('mPlayerT').textContent='新增选手'
   ;['pName','pNo','pAcc','pSchool','pGrade','pGroup','pSession','pSeat','pRemark'].forEach(i=>document.getElementById(i).value='')
   document.getElementById('pDate').value=''
   document.getElementById('pShirt').value=''
+  document.getElementById('ppackage').value=''
   document.getElementById('pChkd').value='0'
+  
+  const comp = COMPS.find(c=>c.id==curCid)
+  if(comp && comp.custom_fields){
+    renderCustomFieldsInModal(JSON.parse(comp.custom_fields), {})
+  }
   openModal('mPlayer')
 }
 
@@ -1454,15 +1647,34 @@ function editPlayerFn(p){
   document.getElementById('pSession').value=p.session||''
   document.getElementById('pSeat').value=p.seat_no||''
   document.getElementById('pShirt').value=p.shirt_size||''
+  document.getElementById('ppackage').value=p.package||''
   document.getElementById('pChkd').value=p.checked_in||0
   document.getElementById('pRemark').value=p.remark||''
+  
+  const comp = COMPS.find(c=>c.id==curCid)
+  if(comp && comp.custom_fields){
+    renderCustomFieldsInModal(JSON.parse(comp.custom_fields), p.custom_data || {})
+  }
   openModal('mPlayer')
 }
 
 async function savePlayer(){
   const name=document.getElementById('pName').value.trim()
   if(!name){toast('姓名为必填','err');return}
-  const data={competition_id:curCid,name,
+  
+  // 收集自定义字段
+  const customData = {}
+  const comp = COMPS.find(c=>c.id==curCid)
+  if(comp && comp.custom_fields){
+    const fields = JSON.parse(comp.custom_fields)
+    for(const f of fields){
+      customData[f] = document.getElementById(`cf_${f}`)?.value || ''
+    }
+  }
+  
+  const data={
+    competition_id:curCid,
+    name,
     player_no:document.getElementById('pNo').value,
     account:document.getElementById('pAcc').value,
     school:document.getElementById('pSchool').value,
@@ -1472,9 +1684,11 @@ async function savePlayer(){
     session:document.getElementById('pSession').value,
     seat_no:document.getElementById('pSeat').value,
     shirt_size:document.getElementById('pShirt').value,
+    package:document.getElementById('ppackage').value,
     checked_in:parseInt(document.getElementById('pChkd').value),
     checkin_time:editPlayer?.checkin_time||'',
-    remark:document.getElementById('pRemark').value
+    remark:document.getElementById('pRemark').value,
+    custom_data: customData
   }
   const url=editPlayer?`/api/players/${editPlayer.id}`:'/api/players'
   const r=await fetch(url,{method:editPlayer?'PUT':'POST',
@@ -1489,6 +1703,7 @@ async function delPlayer(id){
   await loadPlayers(); toast('已删除')
 }
 
+// ==================== 导入导出 ====================
 function openImport(){
   document.getElementById('importCid').value=curCid||''
   document.getElementById('importErrBox').style.display='none'
@@ -1526,6 +1741,7 @@ function exportPlayers(){
     date:document.getElementById('fDate').value,
     session:document.getElementById('fSession').value,
     shirt:document.getElementById('fShirt').value,
+    package:document.getElementById('fpackage').value,
     checked:document.getElementById('fChecked').value
   })
   window.open(`/api/players/export/${curCid}?${params}`)
@@ -1541,9 +1757,13 @@ async function batchDelPlayers(){
   if(r.ok){clearSel();await loadPlayers();await loadComps();toast(`已删除 ${d.count} 名选手`)}
   else toast(d.error||'删除失败','err')
 }
-function dlTemplate(){window.open('/api/players/template')}
 
-// ─ Fields ────────────────────────────────────────────────────
+function dlTemplate(){
+  const cid = curCid || ''
+  window.open(`/api/players/template?competition_id=${cid}`)
+}
+
+// ==================== Fields ====================
 function openFieldsModal(){
   document.getElementById('fieldsCid').value=curCid||''
   loadFieldChips(); openModal('mFields')
@@ -1569,7 +1789,7 @@ async function saveFields(){
   closeModal('mFields'); await loadComps(); toast('字段已保存')
 }
 
-// ─ Stats ──────────────────────────────────────────────────────
+// ==================== Stats ====================
 function onStatsCompChange(){
   if(document.getElementById('stCompSel').value){
     document.getElementById('stLocSel').value=''
@@ -1595,7 +1815,6 @@ async function loadStats(){
   if(!r.ok){toast('权限不足','err');return}
   const d=await r.json()
 
-  // 地点模式：显示包含的赛事列表
   const locBar=document.getElementById('stLocComps')
   if(loc&&d.comp_names&&d.comp_names.length){
     locBar.style.display='block'
@@ -1604,22 +1823,18 @@ async function loadStats(){
 
   const pct=d.total?Math.round(d.checked/d.total*100):0
 
-  // Stat cards
   document.getElementById('st-total').textContent=d.total
   document.getElementById('st-chk').textContent=d.checked
   document.getElementById('st-unchk').textContent=d.unchecked
   document.getElementById('st-rate').textContent=pct+'%'
   document.getElementById('st-prog-pct').textContent=pct+'%'
 
-  // Donut arc: circumference = 2π×15.9 ≈ 100 units
   const arc=document.getElementById('donutArc')
   if(arc) setTimeout(()=>arc.setAttribute('stroke-dasharray',`${pct} ${100-pct}`),100)
 
-  // Progress bar
   const fill=document.getElementById('st-prog-fill')
   if(fill) setTimeout(()=>fill.style.width=pct+'%',100)
 
-  // Bar helper
   const bar=(items,clr)=>items.length
     ? items.map(s=>{
         const p=s.total?Math.round(s.checked/s.total*100):0
@@ -1641,7 +1856,7 @@ async function loadStats(){
     d.by_group.map(g=>({...g,label:g.group_name||'未分组'})),
     'linear-gradient(90deg,#7c3aed,#0088bb)')
 
-  // Shirt size cards
+  // 衣服尺码
   const SHIRT_COLORS={XS:'#7c3aed',S:'#2563eb',M:'#059669',L:'#d97706',XL:'#dc2626',XXL:'#db2777'}
   document.getElementById('stShirt').innerHTML=d.by_shirt.length
     ? d.by_shirt.map(s=>{
@@ -1660,7 +1875,26 @@ async function loadStats(){
         </div>`}).join('')
     : '<div style="color:var(--dim);font-size:12px;padding:8px 0">暂无数据</div>'
 
-  // Recent logs
+  // 赛事包统计
+  const package_COLORS={'标准包':'#34d399','高级包':'#7c3aed','不含赛事包':'#f87171'}
+  document.getElementById('stpackage').innerHTML=d.by_package.length
+    ? d.by_package.map(s=>{
+        const c=package_COLORS[s.package]||'#4a7fa5'
+        const total=d.total||1
+        const w=Math.round(s.total/total*100)
+        return`<div style="background:#fff;border:1.5px solid ${c}30;border-radius:12px;
+                    padding:14px 16px;text-align:center;min-width:80px;flex:1;
+                    box-shadow:0 2px 8px ${c}15">
+          <div style="font-size:18px;font-weight:900;color:${c};margin-bottom:4px">${s.package||'?'}</div>
+          <div style="font-size:28px;font-weight:900;color:#111827;line-height:1">${s.total}</div>
+          <div style="font-size:10px;color:var(--dim);margin-top:4px">个</div>
+          <div style="height:4px;background:#f0f0f0;border-radius:2px;margin-top:8px;overflow:hidden">
+            <div style="height:100%;width:${w}%;background:${c};border-radius:2px"></div>
+          </div>
+        </div>`}).join('')
+    : '<div style="color:var(--dim);font-size:12px;padding:8px 0">暂无数据</div>'
+
+  // 最近签到
   document.getElementById('stRecent').innerHTML=d.recent.length
     ? d.recent.map((r,i)=>`
         <div style="display:flex;align-items:center;gap:10px;padding:9px 0;
@@ -1689,75 +1923,114 @@ function exportStats(){
   window.open(`/api/stats/export/${useCid}${qs}`)
 }
 
+// ==================== Batch Update ====================
+const BATCH_FIELDS=[
+  {k:'group_name',l:'组别',    type:'select_group'},
+  {k:'school',    l:'学校',    type:'text'},
+  {k:'grade',     l:'年级',    type:'text'},
+  {k:'comp_date', l:'比赛日期',type:'date'},
+  {k:'session',   l:'场次',    type:'text'},
+  {k:'seat_no',   l:'座位号',  type:'text'},
+  {k:'shirt_size',l:'衣服尺码',type:'select_shirt'},
+  {k:'package',       l:'赛事包',  type:'select_package'},
+  {k:'remark',    l:'备注',    type:'text'},
+  {k:'checked_in',l:'签到状态',type:'select_status'},
+]
 
-// ─ Admin batch update ─────────────────────────────────────────────
-let buAdminPerms = {}
-
-function openAdminBatchUpdate(){
-  const ids=[...document.querySelectorAll('.admin-chk:checked')].map(c=>parseInt(c.value))
-  if(!ids.length)return
-  document.getElementById('adminBuHint').textContent=`已选 ${ids.length} 名管理员`
-  ;['buAdminRoleChk','buAdminPermChk','buAdminPwdChk','buAdminActiveChk'].forEach(id=>document.getElementById(id).checked=false)
-  document.getElementById('buAdminPwd').value=''
-  document.getElementById('buAdminRole').value=''
-  buAdminPerms={}
-  document.getElementById('buAdminRoleChk').onchange=function(){
-    document.getElementById('buAdminRole').style.opacity=this.checked?'1':'.4'
-    document.getElementById('buAdminRole').style.pointerEvents=this.checked?'auto':'none'
+function openBatchUpdate(){
+  const n=SEL_IDS.size
+  document.getElementById('buHint').textContent=`已选中 ${n} 名选手，勾选要修改的字段：`
+  const comp=COMPS.find(c=>c.id==curCid)
+  const grps=comp?JSON.parse(comp.groups||'[]'):[]
+  
+  let html = BATCH_FIELDS.map(f=>{
+    let inp=''
+    if(f.type==='text') inp=`<input type="text" id="bf_${f.k}" class="inp" style="flex:1;min-width:0">`
+    else if(f.type==='date') inp=`<input type="text" id="bf_${f.k}" class="inp" placeholder="2025-06-15" style="flex:1;min-width:0">`
+    else if(f.type==='select_group') inp=`<select id="bf_${f.k}" class="inp" style="flex:1;min-width:0">
+      <option value="">请选择</option>${grps.map(g=>`<option>${esc(g)}</option>`).join('')}</select>`
+    else if(f.type==='select_shirt') inp=`<select id="bf_${f.k}" class="inp" style="flex:1;min-width:0">
+      <option value="">请选择</option><option>XS</option><option>S</option><option>M</option>
+      <option>L</option><option>XL</option><option>XXL</option></select>`
+    else if(f.type==='select_package') inp=`<select id="bf_${f.k}" class="inp" style="flex:1;min-width:0">
+      <option value="">请选择</option><option>标准包</option><option>高级包</option><option>不含赛事包</option></select>`
+    else if(f.type==='select_status') inp=`<select id="bf_${f.k}" class="inp" style="flex:1;min-width:0">
+      <option value="0">未签到</option><option value="1">已签到</option></select>`
+    return`<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;
+                border-radius:8px;border:1px solid var(--border);background:#f8fbff">
+      <input type="checkbox" id="bfc_${f.k}" style="accent-color:var(--cyan);width:15px;height:15px;cursor:pointer">
+      <label for="bfc_${f.k}" style="font-size:13px;font-weight:600;color:var(--text);width:72px;cursor:pointer;flex-shrink:0">${f.l}</label>
+      ${inp}
+    </div>`
+  }).join('')
+  
+  // 添加自定义字段批量修改
+  if(comp && comp.custom_fields){
+    const fields = JSON.parse(comp.custom_fields)
+    if(fields.length){
+      html += '<div style="margin-top:12px;font-size:12px;font-weight:600;color:var(--cyan)">自定义字段</div>'
+      html += fields.map(f => `
+        <div style="display:flex;align-items:center;gap:10px;padding:8px 10px;
+                    border-radius:8px;border:1px solid var(--border);background:#f8f4ff">
+          <input type="checkbox" id="bfc_custom_${f}" style="accent-color:var(--purple);width:15px;height:15px;cursor:pointer">
+          <label for="bfc_custom_${f}" style="font-size:13px;font-weight:600;color:var(--text);width:72px;cursor:pointer;flex-shrink:0">${f}</label>
+          <input type="text" id="bf_custom_${f}" class="inp custom-field-input" style="flex:1;min-width:0" placeholder="请输入新值">
+        </div>
+      `).join('')
+    }
   }
-  document.getElementById('buAdminPermChk').onchange=function(){
-    document.getElementById('buAdminPermGrid').style.opacity=this.checked?'1':'.5'
-    document.getElementById('buAdminPermGrid').style.pointerEvents=this.checked?'auto':'none'
-  }
-  document.getElementById('buAdminPwdChk').onchange=function(){
-    document.getElementById('buAdminPwd').style.opacity=this.checked?'1':'.5'
-    document.getElementById('buAdminPwd').style.pointerEvents=this.checked?'auto':'none'
-  }
-  document.getElementById('buAdminActiveChk').onchange=function(){
-    document.getElementById('buAdminActive').style.opacity=this.checked?'1':'.4'
-    document.getElementById('buAdminActive').style.pointerEvents=this.checked?'auto':'none'
-  }
-  document.getElementById('buAdminPermGrid').innerHTML=PERMS.map(p=>`
-    <div class="perm-card" onclick="toggleBuPerm('${p.k}',this)">
-      <div class="perm-chk"></div>
-      <span class="perm-lbl">${p.l}</span>
-    </div>`).join('')
-  openModal('mAdminBatchUpdate')
+  
+  document.getElementById('buGrid').innerHTML = html
+  openModal('mBatchUpdate')
 }
 
-function toggleBuPerm(k,el){
-  buAdminPerms[k]=!buAdminPerms[k]
-  el.classList.toggle('on',buAdminPerms[k])
-  el.querySelector('.perm-chk').textContent=buAdminPerms[k]?'✓':''
-}
-
-async function doAdminBatchUpdate(){
-  const ids=[...document.querySelectorAll('.admin-chk:checked')].map(c=>parseInt(c.value))
-  if(!ids.length){toast('未选择管理员','err');return}
-  const data={ids}
-  if(document.getElementById('buAdminRoleChk').checked){
-    data.role_name=document.getElementById('buAdminRole').value.trim()
+async function doBatchUpdate(){
+  const fields={}
+  const customFields={}
+  
+  // 收集普通字段
+  for(const f of BATCH_FIELDS){
+    const chk=document.getElementById('bfc_'+f.k)
+    if(chk&&chk.checked){
+      const val=document.getElementById('bf_'+f.k).value
+      fields[f.k]=f.k==='checked_in'?parseInt(val):val
+    }
   }
-  if(document.getElementById('buAdminActiveChk').checked){
-    data.is_active=parseInt(document.getElementById('buAdminActive').value)
+  
+  // 收集自定义字段
+  const comp = COMPS.find(c=>c.id==curCid)
+  if(comp && comp.custom_fields){
+    const cfList = JSON.parse(comp.custom_fields)
+    for(const f of cfList){
+      const chk = document.getElementById(`bfc_custom_${f}`)
+      if(chk && chk.checked){
+        const val = document.getElementById(`bf_custom_${f}`).value
+        if(val) customFields[f] = val
+      }
+    }
   }
-  if(document.getElementById('buAdminPermChk').checked){
-    data.permissions=buAdminPerms
+  
+  if(!Object.keys(fields).length && !Object.keys(customFields).length){
+    toast('请勾选至少一个字段','err')
+    return
   }
-  if(document.getElementById('buAdminPwdChk').checked){
-    const pwd=document.getElementById('buAdminPwd').value.trim()
-    if(!pwd||pwd.length<6){toast('密码至少6位','err');return}
-    data.reset_password=pwd
+  
+  const data = {
+    ids:[...SEL_IDS],
+    fields: fields,
+    custom_fields: customFields
   }
-  const r=await fetch('/api/admins/batch_update',{method:'POST',
+  
+  const r=await fetch('/api/players/batch_update',{method:'POST',
     headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
   const d=await r.json()
-  if(r.ok){closeModal('mAdminBatchUpdate');await loadAdmins();toast('批量修改成功')}
+  if(r.ok){closeModal('mBatchUpdate');clearSel();await loadPlayers();toast(`已批量修改 ${d.count} 名选手`)}
   else toast(d.error||'修改失败','err')
 }
 
-// ─ Admins ────────────────────────────────────────────────────
+// ==================== Admins ====================
 let ADMINS_ALL = []
+let buAdminPerms = {}
 
 async function loadAdmins(){
   const r=await fetch('/api/admins'); if(!r.ok)return
@@ -1907,7 +2180,71 @@ async function delAdmin(id){
   await loadAdmins(); toast('已删除')
 }
 
-// ─ Password ──────────────────────────────────────────────────
+// ==================== Admin Batch Update ====================
+function openAdminBatchUpdate(){
+  const ids=[...document.querySelectorAll('.admin-chk:checked')].map(c=>parseInt(c.value))
+  if(!ids.length)return
+  document.getElementById('adminBuHint').textContent=`已选 ${ids.length} 名管理员`
+  ;['buAdminRoleChk','buAdminPermChk','buAdminPwdChk','buAdminActiveChk'].forEach(id=>document.getElementById(id).checked=false)
+  document.getElementById('buAdminPwd').value=''
+  document.getElementById('buAdminRole').value=''
+  buAdminPerms={}
+  document.getElementById('buAdminRoleChk').onchange=function(){
+    document.getElementById('buAdminRole').style.opacity=this.checked?'1':'.4'
+    document.getElementById('buAdminRole').style.pointerEvents=this.checked?'auto':'none'
+  }
+  document.getElementById('buAdminPermChk').onchange=function(){
+    document.getElementById('buAdminPermGrid').style.opacity=this.checked?'1':'.5'
+    document.getElementById('buAdminPermGrid').style.pointerEvents=this.checked?'auto':'none'
+  }
+  document.getElementById('buAdminPwdChk').onchange=function(){
+    document.getElementById('buAdminPwd').style.opacity=this.checked?'1':'.5'
+    document.getElementById('buAdminPwd').style.pointerEvents=this.checked?'auto':'none'
+  }
+  document.getElementById('buAdminActiveChk').onchange=function(){
+    document.getElementById('buAdminActive').style.opacity=this.checked?'1':'.4'
+    document.getElementById('buAdminActive').style.pointerEvents=this.checked?'auto':'none'
+  }
+  document.getElementById('buAdminPermGrid').innerHTML=PERMS.map(p=>`
+    <div class="perm-card" onclick="toggleBuPerm('${p.k}',this)">
+      <div class="perm-chk"></div>
+      <span class="perm-lbl">${p.l}</span>
+    </div>`).join('')
+  openModal('mAdminBatchUpdate')
+}
+
+function toggleBuPerm(k,el){
+  buAdminPerms[k]=!buAdminPerms[k]
+  el.classList.toggle('on',buAdminPerms[k])
+  el.querySelector('.perm-chk').textContent=buAdminPerms[k]?'✓':''
+}
+
+async function doAdminBatchUpdate(){
+  const ids=[...document.querySelectorAll('.admin-chk:checked')].map(c=>parseInt(c.value))
+  if(!ids.length){toast('未选择管理员','err');return}
+  const data={ids}
+  if(document.getElementById('buAdminRoleChk').checked){
+    data.role_name=document.getElementById('buAdminRole').value.trim()
+  }
+  if(document.getElementById('buAdminActiveChk').checked){
+    data.is_active=parseInt(document.getElementById('buAdminActive').value)
+  }
+  if(document.getElementById('buAdminPermChk').checked){
+    data.permissions=buAdminPerms
+  }
+  if(document.getElementById('buAdminPwdChk').checked){
+    const pwd=document.getElementById('buAdminPwd').value.trim()
+    if(!pwd||pwd.length<6){toast('密码至少6位','err');return}
+    data.reset_password=pwd
+  }
+  const r=await fetch('/api/admins/batch_update',{method:'POST',
+    headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+  const d=await r.json()
+  if(r.ok){closeModal('mAdminBatchUpdate');await loadAdmins();toast('批量修改成功')}
+  else toast(d.error||'修改失败','err')
+}
+
+// ==================== Password ====================
 async function changePwd(){
   const op=document.getElementById('op').value
   const np=document.getElementById('np').value
@@ -1923,7 +2260,7 @@ async function changePwd(){
   else toast(d.error||'修改失败','err')
 }
 
-// ─ Nav ────────────────────────────────────────────────────────
+// ==================== Nav ====================
 const TITLES={competitions:'COMPETITIONS',players:'PLAYERS',stats:'STATISTICS',admins:'TEAM',changepwd:'PASSWORD'}
 function nav(name,el){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'))
@@ -1944,13 +2281,13 @@ function closeSidebar(){
   document.getElementById('sbOverlay').classList.remove('show')
 }
 
-// ─ Modal ─────────────────────────────────────────────────────
+// ==================== Modal ====================
 function openModal(id){document.getElementById(id).classList.add('show')}
 function closeModal(id){document.getElementById(id).classList.remove('show')}
 document.querySelectorAll('.modal-bg').forEach(el=>
   el.addEventListener('click',function(e){if(e.target===this)this.classList.remove('show')}))
 
-// ─ Toast ─────────────────────────────────────────────────────
+// ==================== Toast ====================
 function toast(msg,type='ok'){
   const el=document.getElementById('toast')
   el.innerHTML=`<span>${type==='ok'?'✅':'❌'}</span><span>${msg}</span>`
@@ -1960,65 +2297,12 @@ function toast(msg,type='ok'){
 
 async function logout(){await fetch('/api/admin/logout',{method:'POST'});location.href='/admin'}
 
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function esc(s){
+  if(s === null || s === undefined) return ''
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;')}
 
-// ─ 批量修改 ──────────────────────────────────────────────────
-const BATCH_FIELDS=[
-  {k:'group_name',l:'组别',    type:'select_group'},
-  {k:'school',    l:'学校',    type:'text'},
-  {k:'grade',     l:'年级',    type:'text'},
-  {k:'comp_date', l:'比赛日期',type:'date'},
-  {k:'session',   l:'场次',    type:'text'},
-  {k:'seat_no',   l:'座位号',  type:'text'},
-  {k:'shirt_size',l:'衣服尺码',type:'select_shirt'},
-  {k:'remark',    l:'备注',    type:'text'},
-  {k:'checked_in',l:'签到状态',type:'select_status'},
-]
-
-function openBatchUpdate(){
-  const n=SEL_IDS.size
-  document.getElementById('buHint').textContent=`已选中 ${n} 名选手，勾选要修改的字段：`
-  const comp=COMPS.find(c=>c.id==curCid)
-  const grps=comp?JSON.parse(comp.groups||'[]'):[]
-  document.getElementById('buGrid').innerHTML=BATCH_FIELDS.map(f=>{
-    let inp=''
-    if(f.type==='text') inp=`<input type="text" id="bf_${f.k}" class="inp" style="flex:1;min-width:0">`
-    else if(f.type==='date') inp=`<input type="text" id="bf_${f.k}" class="inp" placeholder="2025-06-15" style="flex:1;min-width:0">`
-    else if(f.type==='select_group') inp=`<select id="bf_${f.k}" class="inp" style="flex:1;min-width:0">
-      <option value="">请选择</option>${grps.map(g=>`<option>${esc(g)}</option>`).join('')}</select>`
-    else if(f.type==='select_shirt') inp=`<select id="bf_${f.k}" class="inp" style="flex:1;min-width:0">
-      <option value="">请选择</option><option>XS</option><option>S</option><option>M</option>
-      <option>L</option><option>XL</option><option>XXL</option></select>`
-    else if(f.type==='select_status') inp=`<select id="bf_${f.k}" class="inp" style="flex:1;min-width:0">
-      <option value="0">未签到</option><option value="1">已签到</option></select>`
-    return`<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;
-                border-radius:8px;border:1px solid var(--border);background:#f8fbff">
-      <input type="checkbox" id="bfc_${f.k}" style="accent-color:var(--cyan);width:15px;height:15px;cursor:pointer">
-      <label for="bfc_${f.k}" style="font-size:13px;font-weight:600;color:var(--text);width:72px;cursor:pointer;flex-shrink:0">${f.l}</label>
-      ${inp}
-    </div>`
-  }).join('')
-  openModal('mBatchUpdate')
-}
-
-async function doBatchUpdate(){
-  const fields={}
-  for(const f of BATCH_FIELDS){
-    const chk=document.getElementById('bfc_'+f.k)
-    if(chk&&chk.checked){
-      const val=document.getElementById('bf_'+f.k).value
-      fields[f.k]=f.k==='checked_in'?parseInt(val):val
-    }
-  }
-  if(!Object.keys(fields).length){toast('请勾选至少一个字段','err');return}
-  const r=await fetch('/api/players/batch_update',{method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ids:[...SEL_IDS],fields})})
-  const d=await r.json()
-  if(r.ok){closeModal('mBatchUpdate');clearSel();await loadPlayers();toast(`已批量修改 ${d.count} 名选手`)}
-  else toast(d.error||'修改失败','err')
-}
-
+// ==================== 启动 ====================
 init()
 </script>
 
@@ -2060,7 +2344,7 @@ init()
       </div></div>
       <div style="background:rgba(0,150,220,.04);border:1px solid var(--border);border-radius:9px;padding:12px;font-size:11px;color:var(--dim);line-height:1.9">
         📋 请先下载模板，按格式填写后上传<br>
-        必填：<strong style="color:#ff6b6b">赛事名称</strong>；支持：地点、时间、欢迎语、组别、说明、云相册链接、负责人等
+        必填：<strong style="color:#ff6b6b">赛事名称</strong>；支持：地点、时间、欢迎语、组别、说明、云相册链接、负责人、<strong style="color:#7c3aed">自定义字段</strong>等
       </div>
       <div id="compImportErrBox" style="display:none;margin-top:10px;background:#fff1f0;
            border:1px solid #ffa39e;border-left:4px solid #dc2626;border-radius:8px;

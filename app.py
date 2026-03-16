@@ -523,7 +523,11 @@ def import_competitions():
             warnings.append(f'第{row_i}行：赛事名称为空，已跳过');
             continue
         grps = [g.strip() for g in d.get('groups', '').split(',') if g.strip()]
-        custom_fields = [f.strip() for f in d.get('custom_fields', '').split(',') if f.strip()]
+        custom_fields = [f.strip() for f in d.get('custom_fields','').split(',') if f.strip()]
+        if custom_fields:
+            for f in custom_fields:
+                if not re.match(r'^[\u4e00-\u9fa5a-zA-Z0-9_]+$', f):
+                    warnings.append(f'第{row_i}行：自定义字段"{f}"只能包含中文、字母、数字和下划线')
         is_active = 0 if d.get('is_active', '') in ('0', '否', '下线', 'no') else 1
         # 解析子管理员
         comp_admins = []
