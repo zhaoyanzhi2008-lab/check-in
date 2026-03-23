@@ -649,8 +649,8 @@ tr.tr-sel td{background:rgba(0,153,204,.04)}
     <div class="banner-nav">
       <div class="brand">
         <div class="brand-logo">
-          <img src="/static/logo.png" style="width:100%;height:100%;object-fit:contain;border-radius:8px"
-               onerror="this.style.display='none';this.insertAdjacentText('afterend','I')" alt="logo">
+          <!-- 替换为您的logo图片: <img src="/static/logo.png" style="width:100%;height:100%;object-fit:contain;border-radius:8px"> -->
+          I
         </div>
         <div class="brand-info">
           <div class="brand-name">ICODE</div>
@@ -755,9 +755,9 @@ tr.tr-sel td{background:rgba(0,153,204,.04)}
 const SHIRT_CLR={XS:'#c084fc',S:'#60a5fa',M:'#34d399',L:'#fbbf24',XL:'#f87171',XXL:'#f472b6'}
 const FL={name:'姓名',player_no:'报名编号',account:'账号',school:'学校',grade:'年级',
   group_name:'组别',comp_date:'比赛日期',session:'场次',seat_no:'座位号',
-  shirt_size:'衣服尺码',checked_in:'签到状态',checkin_time:'签到时间',remark:'备注'}
+  shirt_size:'衣服尺码',package:'赛事包',checked_in:'签到状态',checkin_time:'签到时间',remark:'备注'}
 
-let CID=null, COMP=null, players=[], dispFields=[], selIds=new Set()
+let CID=null, COMP=null, players=[], dispFields=[], extraFieldDefs=[], selIds=new Set()
 
 // ─ Clock ─────────────────────────────────────────────────────────
 ;(function tick(){
@@ -879,6 +879,7 @@ async function doQuery(){
     const data=await res.json()
     if(!res.ok){showErr(data.error);return}
     players=data.players; dispFields=data.display_fields
+    extraFieldDefs=data.extra_field_defs||[]
     selIds=new Set()
     renderResults()
   } finally { hideLoading() }
@@ -918,6 +919,7 @@ function renderSingle(p){
             <div class="pf-label">${FL[f]||f}</div>
             <div class="pf-value">${fmtVal(f,p[f])}</div>
           </div>`).join('')}
+        ${renderExtraFields(p)}
       </div>
       ${!chk
         ? `<div class="pcard-sel">
@@ -932,12 +934,17 @@ function renderSingle(p){
 
 function renderMulti(ps){
   const cols=dispFields.filter(f=>f!=='name')
+  // 收集固定字段的中文名，用于去重
+  const seenHdrs=new Set(cols.map(f=>FL[f]||f))
+  // 自定义字段：show_checkin=true 且 label 不与固定字段重名
+  const extraShowCols=extraFieldDefs.filter(f=>f.show_checkin && f.label && !seenHdrs.has(f.label))
   document.getElementById('resContent').innerHTML=`
     <div class="tbl-scroll">
       <table>
         <thead><tr>
           <th></th><th>姓名</th>
           ${cols.map(f=>`<th>${FL[f]||f}</th>`).join('')}
+          ${extraShowCols.map(f=>`<th>${esc(f.label)}</th>`).join('')}
           <th>状态</th>
         </tr></thead>
         <tbody>
@@ -951,6 +958,7 @@ function renderMulti(ps){
               </td>
               <td><strong>${esc(p.name)}</strong></td>
               ${cols.map(f=>`<td>${fmtVal(f,p[f])}</td>`).join('')}
+              ${renderExtraFieldCells(p,extraShowCols)}
               <td>
                 ${chk
                   ? `<span style="color:var(--green);font-size:11px;font-weight:700">✓ 已签到</span>`
@@ -1028,6 +1036,36 @@ function resetAll(){
   document.getElementById('results').classList.remove('show')
   document.getElementById('queryInput').value=''
   players=[];selIds=new Set();hideErr();updateBtn()
+}
+
+function renderExtraFields(p){
+  // 只渲染 show_checkin=true 的自定义字段
+  // 去重：label 不与已显示的固定字段中文名重名
+  const fixedLabels=new Set(dispFields.filter(f=>f!=='name').map(f=>FL[f]||f))
+  const ed=JSON.parse(p.extra_data||'{}')
+  const seenLabels=new Set()
+  return extraFieldDefs
+    .filter(f=>{
+      if(!f.show_checkin || !f.label) return false
+      if(fixedLabels.has(f.label)) return false  // 与固定字段重名
+      if(seenLabels.has(f.label)) return false   // 自定义字段内重名
+      seenLabels.add(f.label)
+      return true
+    })
+    .map(f=>{
+      const v=ed[f.key]||''
+      if(!v)return''
+      return`<div class="pf-item">
+        <div class="pf-label">${esc(f.label)}</div>
+        <div class="pf-value">${esc(v)}</div>
+      </div>`
+    }).join('')
+}
+
+function renderExtraFieldCells(p, cols){
+  const ed=JSON.parse(p.extra_data||'{}')
+  const defs=cols||extraFieldDefs.filter(f=>f.show_checkin)
+  return defs.map(f=>`<td>${esc(ed[f.key]||'—')}</td>`).join('')
 }
 
 function fmtVal(f,v){
